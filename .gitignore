@@ -33,9 +33,15 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# supabase cli local state (linked project ref, pooler url)
+/supabase/.temp/
+
 # vercel
 .vercel
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# allow the variable-name template
+!.env.example
