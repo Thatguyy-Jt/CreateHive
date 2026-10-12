@@ -1,26 +1,965 @@
 @import "tailwindcss";
 
+/* ==========================================================================
+   1. TOKENS: raw palette
+   Raw ramps are emitted as CSS variables (static) so components and the
+   specimen page can reference them. Components should prefer the semantic
+   tokens in section 2.
+   ========================================================================== */
+
+@theme static {
+  /* Ink: deep green-black, primary text and primary buttons */
+  --color-ink-50: #f1f5f4;
+  --color-ink-100: #dce6e4;
+  --color-ink-200: #b9ccc8;
+  --color-ink-300: #8faaa5;
+  --color-ink-400: #64847f;
+  --color-ink-500: #47665f;
+  --color-ink-600: #34504a;
+  --color-ink-700: #263d38;
+  --color-ink-800: #1a2e2a;
+  --color-ink-900: #10201e;
+  --color-ink-950: #08120f;
+
+  /* Signal: mint accent. Always paired with ink text, never used as text on light backgrounds */
+  --color-signal-50: #ecfdf5;
+  --color-signal-100: #d1fae6;
+  --color-signal-200: #a5f3cf;
+  --color-signal-300: #6ee7b4;
+  --color-signal-400: #3ddc97;
+  --color-signal-500: #1fc27e;
+  --color-signal-600: #149e66;
+  --color-signal-700: #117c52;
+  --color-signal-800: #0f6142;
+  --color-signal-900: #0c4f37;
+
+  /* Tints: section backgrounds and offset shadows */
+  --color-tint-sky: #ddeffb;
+  --color-tint-blush: #fde7ef;
+  --color-tint-butter: #fff4cc;
+  --color-tint-lilac: #ece6fd;
+
+  /* Neutrals */
+  --color-neutral-50: #f7f7f5;
+  --color-neutral-200: #e4e4e0;
+  --color-neutral-400: #a3a39d;
+  --color-neutral-600: #5e5e58;
+  --color-neutral-900: #171715;
+}
+
+/* ==========================================================================
+   2. TOKENS: semantic (shadcn-compatible names)
+   Components use these. Dark mode and tinted sections redefine them.
+   ========================================================================== */
+
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: var(--color-ink-900);
+  --surface: #ffffff;
+  --surface-muted: var(--color-neutral-50);
+  --primary: var(--color-ink-900);
+  --primary-foreground: var(--color-signal-400);
+  --primary-hover: var(--color-signal-400);
+  --primary-hover-foreground: var(--color-ink-900);
+  --accent: var(--color-signal-400);
+  --accent-foreground: var(--color-ink-900);
+  --muted: var(--color-neutral-50);
+  --muted-foreground: var(--color-neutral-600);
+  --border: var(--color-neutral-200);
+  --ring: var(--color-signal-600);
+  --success: var(--color-signal-700);
+  --warning: #9a5b00;
+  --danger: #c2410c;
+  --offset-shadow-color: var(--color-tint-sky);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0b1513;
+    --foreground: #eef3f2;
+    --surface: #13211e;
+    --surface-muted: #1a2c28;
+    --primary: var(--color-signal-400);
+    --primary-foreground: var(--color-ink-900);
+    --primary-hover: #eef3f2;
+    --primary-hover-foreground: var(--color-ink-900);
+    --accent: var(--color-signal-400);
+    --accent-foreground: var(--color-ink-900);
+    --muted: #1a2c28;
+    --muted-foreground: #a3b3af;
+    --border: #24372f;
+    --ring: var(--color-signal-400);
+    --success: var(--color-signal-400);
+    --warning: #f5c56b;
+    --danger: #fb8a5c;
+    --offset-shadow-color: var(--color-ink-700);
+  }
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+
+  /* Fonts (variables are set by next/font in app/layout.tsx) */
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-accent: var(--font-instrument-serif), ui-serif, Georgia, serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* Type scale, spacing, radii, shadows */
+@theme {
+  /* Fluid display scale: mobile → desktop */
+  --text-display-xl: clamp(2.5rem, 1.6rem + 3.8vw, 4.5rem);
+  --text-display-xl--line-height: 1.05;
+  --text-display-xl--letter-spacing: -0.03em;
+  --text-display-lg: clamp(2.125rem, 1.5rem + 2.6vw, 3.5rem);
+  --text-display-lg--line-height: 1.1;
+  --text-display-lg--letter-spacing: -0.025em;
+  --text-display-md: clamp(1.75rem, 1.35rem + 1.7vw, 2.75rem);
+  --text-display-md--line-height: 1.15;
+  --text-display-md--letter-spacing: -0.02em;
+  --text-heading: clamp(1.375rem, 1.15rem + 0.9vw, 2rem);
+  --text-heading--line-height: 1.2;
+  --text-heading--letter-spacing: -0.015em;
+  --text-lead: clamp(1.125rem, 1.08rem + 0.2vw, 1.25rem);
+  --text-lead--line-height: 1.6;
+
+  /* Section rhythm: shrinks on mobile, grows on desktop */
+  --spacing-section-sm: clamp(3rem, 2.4rem + 2.5vw, 4.5rem);
+  --spacing-section-md: clamp(4rem, 3.2rem + 3.4vw, 6rem);
+  --spacing-section-lg: clamp(6rem, 4.4rem + 6.8vw, 10rem);
+
+  /* Containers */
+  --container-page: 77.5rem; /* 1240px */
+  --container-narrow: 47.5rem; /* 760px */
+  --container-wide: 90rem; /* 1440px */
+
+  /* Radii */
+  --radius-sm: 0.5rem; /* 8px */
+  --radius-md: 1rem; /* 16px */
+  --radius-lg: 1.5rem; /* 24px */
+  --radius-pill: 9999px;
+
+  /* Shadows: flat offset for depth, blur only for floating UI */
+  --shadow-offset: 12px 12px 0 0 var(--offset-shadow-color);
+  --shadow-offset-sm: 8px 8px 0 0 var(--offset-shadow-color);
+  --shadow-float: 0 12px 32px -8px rgb(16 32 30 / 0.18), 0 2px 6px rgb(16 32 30 / 0.06);
+}
+
+/* ==========================================================================
+   3. BASE
+   ========================================================================== */
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--color-signal-200);
+    color: var(--color-ink-900);
+  }
+
+  /* ---- Typography defaults ---- */
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-weight: 700;
+    text-wrap: balance;
+  }
+
+  h1 {
+    font-size: var(--text-display-lg);
+    line-height: var(--text-display-lg--line-height);
+    letter-spacing: var(--text-display-lg--letter-spacing);
+  }
+
+  h2 {
+    font-size: var(--text-display-md);
+    line-height: var(--text-display-md--line-height);
+    letter-spacing: var(--text-display-md--letter-spacing);
+  }
+
+  h3 {
+    font-size: var(--text-heading);
+    line-height: var(--text-heading--line-height);
+    letter-spacing: var(--text-heading--letter-spacing);
+  }
+
+  h4 {
+    font-size: 1.125rem;
+    line-height: 1.4;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  code,
+  kbd,
+  pre {
+    font-family: var(--font-mono);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ==========================================================================
+   4. TYPOGRAPHY PRIMITIVES
+   ========================================================================== */
+
+@layer components {
+  .lead {
+    font-size: var(--text-lead);
+    line-height: var(--text-lead--line-height);
+    color: var(--muted-foreground);
+  }
+
+  .eyebrow {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+
+  /* The one highlighted word in a headline: serif italic with an accent
+     highlighter bar. Text keeps the surrounding colour so contrast holds. */
+  .accent-word {
+    font-family: var(--font-accent);
+    font-style: italic;
+    font-weight: 400;
+    letter-spacing: 0;
+    padding-inline: 0.06em;
+    background-image: linear-gradient(
+      transparent 62%,
+      color-mix(in srgb, var(--accent) 55%, transparent) 62%
+    );
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+}
+
+/* ==========================================================================
+   5. LAYOUT: containers and sections
+   ========================================================================== */
+
+@utility container-page {
+  width: 100%;
+  max-width: var(--container-page);
+  margin-inline: auto;
+  padding-inline: 1rem;
+
+  @media (width >= 48rem) {
+    padding-inline: 1.5rem;
+  }
+
+  @media (width >= 64rem) {
+    padding-inline: 2rem;
+  }
+}
+
+@utility container-narrow {
+  width: 100%;
+  max-width: var(--container-narrow);
+  margin-inline: auto;
+  padding-inline: 1rem;
+
+  @media (width >= 48rem) {
+    padding-inline: 1.5rem;
+  }
+}
+
+@utility container-wide {
+  width: 100%;
+  max-width: var(--container-wide);
+  margin-inline: auto;
+  padding-inline: 1rem;
+
+  @media (width >= 48rem) {
+    padding-inline: 1.5rem;
+  }
+
+  @media (width >= 64rem) {
+    padding-inline: 2rem;
+  }
+}
+
+@layer components {
+  .section {
+    padding-block: var(--spacing-section-md);
+  }
+
+  .section-sm {
+    padding-block: var(--spacing-section-sm);
+  }
+
+  .section-lg {
+    padding-block: var(--spacing-section-lg);
+  }
+
+  /* Tinted sections stay light in both themes, so they pin ink-based tokens
+     locally and everything inside keeps AA contrast. */
+  .section-tint-sky,
+  .section-tint-blush,
+  .section-tint-butter,
+  .section-tint-lilac {
+    --foreground: var(--color-ink-900);
+    --muted-foreground: var(--color-ink-600);
+    --border: rgb(16 32 30 / 0.12);
+    --surface: #ffffff;
+    --primary: var(--color-ink-900);
+    --primary-foreground: var(--color-signal-400);
+    --primary-hover: var(--color-signal-400);
+    --primary-hover-foreground: var(--color-ink-900);
+    --ring: var(--color-ink-900);
+    --offset-shadow-color: var(--color-ink-900);
+    color: var(--foreground);
+  }
+
+  .section-tint-sky {
+    background-color: var(--color-tint-sky);
+  }
+
+  .section-tint-blush {
+    background-color: var(--color-tint-blush);
+  }
+
+  .section-tint-butter {
+    background-color: var(--color-tint-butter);
+  }
+
+  .section-tint-lilac {
+    background-color: var(--color-tint-lilac);
+  }
+
+  /* Dark ink section: accent becomes the primary action colour. */
+  .section-dark {
+    --foreground: #eef3f2;
+    --muted-foreground: var(--color-ink-200);
+    --border: rgb(255 255 255 / 0.14);
+    --surface: var(--color-ink-800);
+    --surface-muted: var(--color-ink-700);
+    --primary: var(--color-signal-400);
+    --primary-foreground: var(--color-ink-900);
+    --primary-hover: #eef3f2;
+    --primary-hover-foreground: var(--color-ink-900);
+    --ring: var(--color-signal-400);
+    --offset-shadow-color: var(--color-signal-400);
+    background-color: var(--color-ink-900);
+    color: var(--foreground);
+  }
+}
+
+/* ==========================================================================
+   6. BUTTONS
+   ========================================================================== */
+
+@layer components {
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 2.75rem; /* 44px tap target */
+    padding: 0.75rem 1.5rem;
+    border: 1.5px solid transparent;
+    border-radius: 0.75rem;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.2;
+    text-align: center;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    transition:
+      background-color 200ms ease,
+      color 200ms ease,
+      border-color 200ms ease;
+  }
+
+  .btn:disabled,
+  .btn[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  /* Primary: inverts on hover */
+  .btn-primary {
+    background-color: var(--primary);
+    border-color: var(--primary);
+    color: var(--primary-foreground);
+  }
+
+  .btn-primary:hover {
+    background-color: var(--primary-hover);
+    border-color: var(--primary-hover);
+    color: var(--primary-hover-foreground);
+  }
+
+  .btn-secondary {
+    background-color: transparent;
+    border-color: var(--foreground);
+    color: var(--foreground);
+  }
+
+  .btn-secondary:hover {
+    background-color: var(--foreground);
+    color: var(--background);
+  }
+
+  /* Inside tinted sections --background is not the section colour */
+  :where(.section-tint-sky, .section-tint-blush, .section-tint-butter, .section-tint-lilac)
+    .btn-secondary:hover {
+    color: #ffffff;
+  }
+
+  .section-dark .btn-secondary:hover {
+    color: var(--color-ink-900);
+  }
+
+  .btn-ghost {
+    background-color: transparent;
+    color: var(--foreground);
+  }
+
+  .btn-ghost:hover {
+    background-color: color-mix(in srgb, var(--foreground) 8%, transparent);
+  }
+
+  .btn-accent {
+    background-color: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-foreground);
+  }
+
+  .btn-accent:hover {
+    background-color: var(--color-signal-300);
+    border-color: var(--color-signal-300);
+  }
+
+  /* Sizes */
+  .btn-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    border-radius: var(--radius-sm);
+  }
+
+  .btn-lg {
+    min-height: 3.5rem;
+    padding: 1.125rem 2rem;
+    font-size: 1.125rem;
+    border-radius: var(--radius-md);
+
+    @media (width >= 48rem) {
+      padding: 1.375rem 2.5rem;
+      font-size: 1.25rem;
+    }
+  }
+
+  .btn-block {
+    width: 100%;
+
+    @media (width >= 48rem) {
+      width: auto;
+    }
+  }
+}
+
+/* ==========================================================================
+   7. LINKS
+   ========================================================================== */
+
+@layer components {
+  .link {
+    color: inherit;
+    font-weight: 600;
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+    text-underline-offset: 0.2em;
+    transition:
+      text-decoration-color 200ms ease,
+      text-decoration-thickness 200ms ease;
+  }
+
+  .link:hover {
+    text-decoration-thickness: 2px;
+    text-decoration-color: currentColor;
+  }
+
+  .link-arrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    color: inherit;
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .link-arrow::after {
+    content: "→";
+    content: "→" / "";
+    transition: transform 200ms ease;
+  }
+
+  .link-arrow:hover::after {
+    transform: translateX(4px);
+  }
+}
+
+/* ==========================================================================
+   8. SURFACES: cards and media
+   ========================================================================== */
+
+@layer components {
+  .card {
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 1.5rem;
+
+    @media (width >= 48rem) {
+      padding: 2rem;
+    }
+  }
+
+  /* Flat "sticker" depth: hard offset shadow, no blur */
+  .card-offset {
+    box-shadow: var(--shadow-offset-sm);
+
+    @media (width >= 48rem) {
+      box-shadow: var(--shadow-offset);
+    }
+  }
+
+  .media-frame {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    background-color: var(--surface-muted);
+    border: 1px solid var(--border);
+  }
+
+  .media-frame-offset {
+    box-shadow: var(--shadow-offset-sm);
+
+    @media (width >= 48rem) {
+      box-shadow: var(--shadow-offset);
+    }
+  }
+}
+
+/* ==========================================================================
+   8b. FORMS: field, inputs, chips
+   ========================================================================== */
+
+@layer components {
+  /* Label, control, helper and error text, stacked. */
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    border: 0;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+  }
+
+  .field-label {
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .field-help {
+    font-size: 0.875rem;
+    color: var(--muted-foreground);
+  }
+
+  .field-error {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--danger);
+  }
+
+  .input,
+  .textarea,
+  .select {
+    width: 100%;
+    min-height: 2.75rem; /* 44px tap target */
+    padding: 0.625rem 0.875rem;
+    border: 1.5px solid var(--border);
+    border-radius: 0.75rem;
+    background-color: var(--surface);
+    color: var(--foreground);
+    font: inherit;
+    line-height: 1.4;
+    transition: border-color 200ms ease;
+  }
+
+  .textarea {
+    min-height: 6rem;
+    resize: vertical;
+  }
+
+  .input:hover,
+  .textarea:hover,
+  .select:hover {
+    border-color: var(--muted-foreground);
+  }
+
+  .input:focus-visible,
+  .textarea:focus-visible,
+  .select:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 1px;
+    border-color: var(--ring);
+  }
+
+  .input[aria-invalid="true"],
+  .textarea[aria-invalid="true"],
+  .select[aria-invalid="true"] {
+    border-color: var(--danger);
+  }
+
+  /* Toggle chip around a real checkbox; state is shown by a check mark, not colour alone. */
+  .chip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 2.75rem;
+    padding: 0.5rem 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-pill);
+    background-color: var(--surface);
+    font-weight: 600;
+    line-height: 1.2;
+    cursor: pointer;
+    user-select: none;
+    transition:
+      background-color 200ms ease,
+      border-color 200ms ease;
+  }
+
+  .chip input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .chip:hover {
+    border-color: var(--muted-foreground);
+  }
+
+  .chip::before {
+    content: "+";
+    content: "+" / "";
+    font-weight: 700;
+    color: var(--muted-foreground);
+  }
+
+  .chip:has(input:checked) {
+    border-color: var(--foreground);
+    background-color: var(--surface-muted);
+  }
+
+  .chip:has(input:checked)::before {
+    content: "✓";
+    content: "✓" / "";
+    color: var(--success);
+  }
+
+  .chip:has(input:focus-visible) {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  .alert {
+    padding: 0.875rem 1rem;
+    border: 1.5px solid var(--danger);
+    border-radius: 0.75rem;
+    background-color: color-mix(in srgb, var(--danger) 8%, var(--surface));
+  }
+}
+
+/* Toasts (Sonner). Colours come from the tokens set on <Toaster>; these add
+   the floating shadow, type and a token-styled action button. Deliberately
+   outside @layer: Sonner injects unlayered CSS, which would beat any layer. */
+  [data-sonner-toaster] [data-sonner-toast].toast {
+    box-shadow: var(--shadow-float);
+    font-family: var(--font-sans);
+    gap: 0.75rem;
+    padding: 1rem 1.125rem;
+  }
+
+  [data-sonner-toaster] [data-sonner-toast] .toast-title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  [data-sonner-toaster] [data-sonner-toast] .toast-description {
+    font-size: 0.875rem;
+    line-height: 1.45;
+    color: var(--muted-foreground);
+  }
+
+  [data-sonner-toaster] [data-sonner-toast] .toast-icon {
+    color: var(--success);
+  }
+
+  [data-sonner-toaster] [data-sonner-toast] button.toast-action {
+    min-height: 2.25rem;
+    padding: 0.375rem 0.875rem;
+    border: 1.5px solid var(--foreground);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--foreground);
+    font-size: 0.875rem;
+    font-weight: 700;
+    align-self: center;
+  }
+
+  [data-sonner-toaster] [data-sonner-toast] button.toast-action:hover {
+    background: var(--foreground);
+    color: var(--background);
+  }
+
+  [data-sonner-toaster] [data-sonner-toast] button.toast-action:focus-visible,
+  [data-sonner-toaster] [data-sonner-toast] button.toast-close:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  [data-sonner-toaster] [data-sonner-toast] button.toast-close {
+    background: var(--surface);
+    border-color: var(--border);
+    color: var(--foreground);
+  }
+
+/* ==========================================================================
+   9. RESPONSIVE PRIMITIVES
+   ========================================================================== */
+
+/* Card grid that reflows without breakpoints; min() prevents overflow on small screens */
+@utility grid-auto-fit {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+
+  @media (width >= 64rem) {
+    gap: 2rem;
+  }
+}
+
+/* Media + text: stacks below md, two columns from md */
+@utility split {
+  display: grid;
+  gap: 2.5rem;
+  align-items: center;
+
+  @media (width >= 48rem) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 3rem;
+  }
+
+  @media (width >= 64rem) {
+    gap: 5rem;
+  }
+}
+
+@utility split-reverse {
+  @media (width >= 48rem) {
+    & > :first-child {
+      order: 2;
+    }
+  }
+}
+
+@utility stack-sm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+@utility stack-md {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+@utility stack-lg {
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+}
+
+@layer components {
+  /* Header structure: logo | nav | actions. Nav collapses below lg. */
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background-color: color-mix(in srgb, var(--background) 88%, transparent);
+    backdrop-filter: saturate(1.4) blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .site-header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    min-height: 4rem;
+
+    @media (width >= 64rem) {
+      min-height: 5rem;
+    }
+  }
+
+  .site-header-nav {
+    display: none;
+
+    @media (width >= 64rem) {
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+    }
+  }
+
+  .site-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .site-header-menu-button {
+    @media (width >= 64rem) {
+      display: none;
+    }
+  }
+
+  .announcement-bar {
+    background-color: var(--color-ink-900);
+    color: #eef3f2;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.4;
+    text-align: center;
+    padding: 0.625rem 1rem;
+  }
+
+  .skip-link {
+    position: absolute;
+    left: 1rem;
+    top: 1rem;
+    z-index: 50;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-sm);
+    background-color: var(--primary);
+    color: var(--primary-foreground);
+    font-weight: 700;
+    transform: translateY(-200%);
+  }
+
+  .skip-link:focus-visible {
+    transform: translateY(0);
+  }
+}
+
+/* ==========================================================================
+   10. MARKETING
+   Small additions for the public homepage. Built from existing tokens only.
+   ========================================================================== */
+
+@layer components {
+  /* Hero: faint dot grid with a soft accent glow, readable in both themes */
+  .hero-backdrop {
+    background-image:
+      radial-gradient(
+        ellipse 60% 50% at 85% 10%,
+        color-mix(in srgb, var(--accent) 16%, transparent),
+        transparent 70%
+      ),
+      radial-gradient(
+        circle at 1px 1px,
+        color-mix(in srgb, var(--foreground) 9%, transparent) 1px,
+        transparent 0
+      );
+    background-size:
+      100% 100%,
+      24px 24px;
+  }
+
+  /* Native <details> disclosures (mobile menu, FAQ) without the default marker */
+  .disclosure > summary {
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .disclosure > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .faq-item > summary::after {
+    content: "+";
+    content: "+" / "";
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-pill);
+    font-weight: 600;
+    transition: transform 200ms ease;
+  }
+
+  .faq-item[open] > summary::after {
+    transform: rotate(45deg);
+  }
 }
