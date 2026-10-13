@@ -25,6 +25,7 @@ interface TaskRoute {
 export const AI_TASK_ROUTES: Record<AiKind, TaskRoute> = {
   smoke_test: { tier: "fast", maxOutputTokens: 1_000 },
   creator_strategy: { tier: "quality", maxOutputTokens: 8_000 },
+  content_opportunities: { tier: "quality", maxOutputTokens: 6_000 },
 };
 
 export interface ResolvedRoute {

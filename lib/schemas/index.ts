@@ -5,3 +5,4 @@ export * from "./insights";
 export * from "./json";
 export * from "./opportunities";
 export * from "./parse";
+export * from "./research";

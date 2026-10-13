@@ -100,6 +100,75 @@ describe.skipIf(!LIVE)("AI service (live)", () => {
     console.info(`live strategy: model=${result.usage.model} cost_micros=${result.usage.costMicros}`);
   }, 180_000);
 
+  it("generates content_opportunities that pass app validation", async () => {
+    const { opportunityModelSchemaFor, opportunityOutputFor } = await import("@/lib/schemas/opportunities");
+    const { parseWith } = await import("@/lib/schemas/parse");
+    const { renderContextForPrompt } = await import("@/lib/services/creator-context");
+    const platforms = ["youtube", "tiktok"] as const;
+    const pillars = [
+      { name: "Quick home workouts", description: "Short sessions that fit around kids." },
+      { name: "Fuel for busy days", description: "Simple meals and snacks." },
+      { name: "Staying consistent", description: "Habits and mindset for parents." },
+    ];
+    const context = renderContextForPrompt({
+      profile: {
+        niche: "Home workouts for busy parents",
+        audience_description: "Parents of young kids who have 20 minutes a day and no gym.",
+        goals: ["grow_audience"],
+        platforms: [...platforms],
+        posting_capacity_per_week: 3,
+        experience_level: "beginner",
+      },
+      brand: { tone: "warm and practical", voice_traits: ["Encouraging"], do_list: [], dont_list: ["No shaming"], sample_text: null },
+      pillars,
+      strategy: {
+        positioning: "Helps busy parents get fit at home in 20 minutes a day.",
+        growth_objective: "Post 3 times a week for 90 days.",
+        monetization_objective: "Start an email list.",
+        version: 1,
+      },
+      missing: [],
+    });
+    const allowedEvidenceKinds = ["creator_input", "audience_comment", "research_signal"] as const;
+    const signals = [
+      {
+        ref: "S1",
+        type: "audience_comment",
+        source: "manual",
+        kind: "audience_comment",
+        excerpt: "Comment on my squat video: I only have 10 minutes after the kids are in bed, what can I do?",
+      },
+      {
+        ref: "S2",
+        type: "video",
+        source: "youtube",
+        kind: "research_signal",
+        excerpt: "10 Minute No-Equipment Workout for Busy Moms | channel: Example Fit | published Sep 30, 2026 | 48,210 views",
+      },
+    ] as const;
+
+    const result = await lib.runStructured({
+      userId: SMOKE_USER_ID,
+      kind: "content_opportunities",
+      input: { context, platforms, allowedEvidenceKinds, signals, previousTopics: [], dismissedTopics: [] },
+      schema: opportunityModelSchemaFor(
+        allowedEvidenceKinds,
+        signals.map((s) => s.ref),
+      ),
+      validate: (output) =>
+        parseWith(
+          opportunityOutputFor({ pillarNames: pillars.map((p) => p.name), platforms, allowedEvidenceKinds, signals }),
+          output,
+        ),
+    });
+    if (!result.ok) throw new Error(`live opportunities failed: ${result.code}`);
+
+    expect(result.data.opportunities).toHaveLength(5);
+    const refs = result.data.opportunities.flatMap((o) => o.evidence.map((e) => e.signal_ref)).filter(Boolean);
+    console.info(`live opportunities: cited refs=${refs.join(",") || "none"}`);
+    console.info(`live opportunities: model=${result.usage.model} cost_micros=${result.usage.costMicros}`);
+  }, 180_000);
+
   it("returns limit_reached once the cap is hit, without a new generation row", async () => {
     const { runStructuredWith } = await import("@/lib/ai/run-structured");
     const before = await admin

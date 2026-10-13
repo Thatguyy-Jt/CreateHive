@@ -1,3 +1,4 @@
+import { contentOpportunitiesV2 } from "./content_opportunities/v2";
 import { creatorStrategyV1 } from "./creator_strategy/v1";
 import { smokeTestV1 } from "./smoke_test/v1";
 
@@ -8,6 +9,7 @@ import { smokeTestV1 } from "./smoke_test/v1";
 export const ACTIVE_PROMPTS = {
   smoke_test: smokeTestV1,
   creator_strategy: creatorStrategyV1,
+  content_opportunities: contentOpportunitiesV2,
 } as const;
 
 export type AiKind = keyof typeof ACTIVE_PROMPTS;

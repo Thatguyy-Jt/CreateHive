@@ -300,6 +300,7 @@ export type Database = {
       }
       content_ideas: {
         Row: {
+          ai_generation_id: string | null
           angle: string | null
           audience_fit: string | null
           audience_need: string | null
@@ -313,6 +314,8 @@ export type Database = {
           hook: string | null
           id: string
           pillar_id: string | null
+          platform: string | null
+          rationale: string | null
           source: string
           status: string
           topic: string
@@ -321,6 +324,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          ai_generation_id?: string | null
           angle?: string | null
           audience_fit?: string | null
           audience_need?: string | null
@@ -334,6 +338,8 @@ export type Database = {
           hook?: string | null
           id?: string
           pillar_id?: string | null
+          platform?: string | null
+          rationale?: string | null
           source?: string
           status?: string
           topic: string
@@ -342,6 +348,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          ai_generation_id?: string | null
           angle?: string | null
           audience_fit?: string | null
           audience_need?: string | null
@@ -355,6 +362,8 @@ export type Database = {
           hook?: string | null
           id?: string
           pillar_id?: string | null
+          platform?: string | null
+          rationale?: string | null
           source?: string
           status?: string
           topic?: string

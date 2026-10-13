@@ -8,13 +8,18 @@ export function PrivacySection() {
       </h2>
       <ul className="stack-sm list-disc pl-5">
         <li>
-          We store your account email, your creator profile and brand voice, the strategy we generate for you, and a
-          record of each AI generation: what kind it was, which model ran, when, how many tokens it used and what it cost. That
-          record never includes your prompts or the AI&apos;s replies.
+          We store your account email, your creator profile and brand voice, the strategy and content ideas we generate
+          for you, and a record of each AI generation: what kind it was, which model ran, when, how many tokens it used
+          and what it cost. That record never includes your prompts or the AI&apos;s replies.
         </li>
         <li>
-          To produce a result, the details you submit (for your strategy: your profile and brand voice, never your
-          name or email) are sent to OpenAI. We ask OpenAI not to store those responses.
+          We store the research signals you paste until you delete them. YouTube videos fetched for you are deleted
+          after 7 days. To look them up, we send YouTube your niche and one content pillar, nothing else.
+        </li>
+        <li>
+          To produce a result, the details you submit are sent to OpenAI: for your strategy, your profile and brand
+          voice; for content ideas, also your strategy, pillars, the topics of your earlier ideas and a short excerpt of
+          up to 12 research signals. Never your name or email. We ask OpenAI not to store those responses.
         </li>
         <li>
           If something breaks, an error report goes to our monitoring service (Sentry) with cookies, request details
