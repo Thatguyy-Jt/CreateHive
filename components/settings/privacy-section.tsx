@@ -13,13 +13,20 @@ export function PrivacySection() {
           and what it cost. That record never includes your prompts or the AI&apos;s replies.
         </li>
         <li>
+          We store the timezone you confirm and the ideas you put on your calendar, with their dates, so your week shows
+          in your own time. Removing an item from your calendar deletes it, unless it already has content you wrote for
+          it. Only you can see them.
+        </li>
+        <li>
           We store the research signals you paste until you delete them. YouTube videos fetched for you are deleted
           after 7 days. To look them up, we send YouTube your niche and one content pillar, nothing else.
         </li>
         <li>
           To produce a result, the details you submit are sent to OpenAI: for your strategy, your profile and brand
           voice; for content ideas, also your strategy, pillars, the topics of your earlier ideas and a short excerpt of
-          up to 12 research signals. Never your name or email. We ask OpenAI not to store those responses.
+          up to 12 research signals; for a suggested week, your posting capacity, platforms, your strategy&apos;s cadence
+          and weekly theme, what&apos;s already on that week, and the topic, pillar, format and hook of up to 30 saved
+          ideas. Never your name or email. We ask OpenAI not to store those responses.
         </li>
         <li>
           If something breaks, an error report goes to our monitoring service (Sentry) with cookies, request details

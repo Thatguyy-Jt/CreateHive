@@ -1,13 +1,15 @@
 import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
+import { formatDay, formatTime, localDateKey, localTimeKey } from "@/lib/calendar/dates";
 import { logEvent } from "@/lib/observability/log";
-import { opportunityView, type OpportunityView } from "@/lib/schemas/opportunities";
+import { opportunityView, type OpportunityView, type StoredOpportunity } from "@/lib/schemas/opportunities";
+import { getTimezone } from "@/lib/services/calendar";
 import { getOnboardingState } from "@/lib/services/creator-profile";
 import { listOpportunities, type OpportunityCounts } from "@/lib/services/opportunities";
 import { createUserClient } from "@/lib/supabase/server";
 import { FinishSetupCard } from "../strategy/finish-setup-card";
 import { GenerateOpportunitiesControl } from "./generate-opportunities-control";
-import { OpportunityCard } from "./opportunity-card";
+import { OpportunityCard, type PlannedSchedule } from "./opportunity-card";
 
 const VIEWS: { view: OpportunityView; label: string }[] = [
   { view: "new", label: "New" },
@@ -17,7 +19,7 @@ const VIEWS: { view: OpportunityView; label: string }[] = [
 
 const EMPTY: Record<OpportunityView, string> = {
   new: "No ideas waiting. Generate a batch based on your strategy.",
-  saved: "Ideas you save will show up here.",
+  saved: "Ideas you save will show up here, including the ones on your calendar.",
   dismissed: "Nothing dismissed.",
 };
 
@@ -101,6 +103,20 @@ export async function OpportunitiesContent({
     );
   }
 
+  // Planned ideas show their calendar date in the creator's own timezone.
+  let timezone: string | null = null;
+  if (result.items.some((idea) => idea.status === "planned")) {
+    const tz = await getTimezone(client, userId);
+    timezone = tz.ok ? tz.timezone : null;
+  }
+  const scheduleFor = (idea: StoredOpportunity): PlannedSchedule | null => {
+    if (idea.status !== "planned") return null;
+    const date = idea.scheduled_for && timezone ? localDateKey(idea.scheduled_for, timezone) : null;
+    const time = idea.scheduled_for && timezone ? localTimeKey(idea.scheduled_for, timezone) : null;
+    if (!date || !time) return { label: null, href: "/app/calendar" };
+    return { label: `${formatDay(date)}, ${formatTime(time)}`, href: `/app/calendar?week=${date}` };
+  };
+
   const canGenerate = view === "new" && result.hasStrategy;
   const empty = result.items.length === 0;
   const backlog = result.counts.new;
@@ -129,7 +145,7 @@ export async function OpportunitiesContent({
         <ul className="stack-md" aria-label="Ideas">
           {result.items.map((idea) => (
             <li key={idea.id}>
-              <OpportunityCard idea={idea} />
+              <OpportunityCard idea={idea} schedule={scheduleFor(idea)} />
             </li>
           ))}
         </ul>

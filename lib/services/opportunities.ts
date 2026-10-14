@@ -18,6 +18,7 @@ import {
   type OpportunityOutput,
   type OpportunityView,
   type StoredOpportunity,
+  VIEW_STATUSES,
 } from "@/lib/schemas/opportunities";
 import { parseWith } from "@/lib/schemas/parse";
 import type { Database, Json } from "@/lib/supabase/database.types";
@@ -309,12 +310,13 @@ export type ListOpportunitiesResult =
   | { ok: false };
 
 const LIST_COLUMNS =
-  "id, topic, audience_need, angle, hook, format, platform, rationale, cta, difficulty, audience_fit, evidence_strength, evidence, status, created_at, pillar:content_pillars(name)";
+  "id, topic, audience_need, angle, hook, format, platform, rationale, cta, difficulty, audience_fit, evidence_strength, evidence, status, created_at, pillar:content_pillars(name), items:content_items(status, scheduled_for)";
 
 /**
  * The creator's ideas for one view, newest first, plus per-view counts and
- * whether they have a strategy to generate from. Rows that no longer validate
- * are skipped and logged rather than breaking the page. Never throws.
+ * whether they have a strategy to generate from. The Saved view includes
+ * `planned` ideas with their scheduled time. Rows that no longer validate are
+ * skipped and logged rather than breaking the page. Never throws.
  */
 export async function listOpportunities(
   client: OpportunityClient,
@@ -322,19 +324,19 @@ export async function listOpportunities(
   view: OpportunityView,
 ): Promise<ListOpportunitiesResult> {
   try {
-    const count = (status: OpportunityView) =>
+    const count = (counted: OpportunityView) =>
       client
         .from("content_ideas")
         .select("id", { count: "exact", head: true })
         .eq("user_id", userId)
-        .eq("status", status);
+        .in("status", [...VIEW_STATUSES[counted]]);
 
     const [list, strategy, pillars, newCount, savedCount, dismissedCount] = await Promise.all([
       client
         .from("content_ideas")
         .select(LIST_COLUMNS)
         .eq("user_id", userId)
-        .eq("status", view)
+        .in("status", [...VIEW_STATUSES[view]])
         .order("created_at", { ascending: false })
         .limit(LIST_LIMIT),
       client.from("creator_strategies").select("id", { count: "exact", head: true }).eq("user_id", userId),
@@ -355,8 +357,16 @@ export async function listOpportunities(
 
     const items: StoredOpportunity[] = [];
     for (const row of list.data ?? []) {
-      const { pillar, ...rest } = row as typeof row & { pillar: { name: string } | null };
-      const parsed = parseWith(storedOpportunity, { ...rest, pillar_name: pillar?.name ?? null });
+      const { pillar, items: contentItems, ...rest } = row as typeof row & {
+        pillar: { name: string } | null;
+        items: { status: string; scheduled_for: string | null }[] | null;
+      };
+      const scheduled = (contentItems ?? []).find((item) => item.status === "scheduled" && item.scheduled_for);
+      const parsed = parseWith(storedOpportunity, {
+        ...rest,
+        pillar_name: pillar?.name ?? null,
+        scheduled_for: rest.status === "planned" ? (scheduled?.scheduled_for ?? null) : null,
+      });
       if (parsed.ok) items.push(parsed.data);
       else logEvent("warn", "opportunity_read_skipped", { stage: "validate" });
     }

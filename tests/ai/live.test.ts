@@ -169,6 +169,43 @@ describe.skipIf(!LIVE)("AI service (live)", () => {
     console.info(`live opportunities: model=${result.usage.model} cost_micros=${result.usage.costMicros}`);
   }, 180_000);
 
+  it("generates a weekly_plan that passes app validation", async () => {
+    const { weeklyPlanModelSchemaFor, weeklyPlanOutputFor } = await import("@/lib/schemas/calendar");
+    const { parseWith } = await import("@/lib/schemas/parse");
+    const dates = ["2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23", "2026-10-24", "2026-10-25"];
+    const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+    const ideas = [
+      { topic: "10-minute squat routine after bedtime", pillar: "Quick home workouts", difficulty: "easy" },
+      { topic: "Three snacks you can prep in 5 minutes", pillar: "Fuel for busy days", difficulty: "easy" },
+      { topic: "How I stopped skipping workouts", pillar: "Staying consistent", difficulty: "medium" },
+      { topic: "Full-body workout with a backpack", pillar: "Quick home workouts", difficulty: "hard" },
+    ].map((idea, index) => ({ ref: `I${index + 1}`, platform: "youtube", format: "short", hook: null, ...idea }));
+    const refs = ideas.map((idea) => idea.ref);
+
+    const result = await lib.runStructured({
+      userId: SMOKE_USER_ID,
+      kind: "weekly_plan",
+      input: {
+        postingCapacityPerWeek: 3,
+        remainingSlots: 3,
+        platforms: ["youtube"],
+        experienceLevel: "beginner",
+        cadence: [{ platform: "youtube", formats: ["shorts"], cadence: "3 a week" }],
+        weekTheme: { week: 1, theme: "Start small", focus: "Short, easy wins to build the habit." },
+        days: dates.map((date, index) => ({ date, weekday: weekdays[index], past: false, scheduled: 0 })),
+        scheduled: [],
+        ideas,
+      },
+      schema: weeklyPlanModelSchemaFor(refs, dates),
+      validate: (output) =>
+        parseWith(weeklyPlanOutputFor({ refs, dates, remainingCapacity: 3, today: dates[0] }), output),
+    });
+    if (!result.ok) throw new Error(`live weekly plan failed: ${result.code}`);
+
+    expect(result.data.slots.length).toBeLessThanOrEqual(3);
+    console.info(`live weekly plan: slots=${result.data.slots.length} model=${result.usage.model} cost_micros=${result.usage.costMicros}`);
+  }, 180_000);
+
   it("returns limit_reached once the cap is hit, without a new generation row", async () => {
     const { runStructuredWith } = await import("@/lib/ai/run-structured");
     const before = await admin

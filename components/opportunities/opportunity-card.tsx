@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { updateOpportunityStatusAction, type StatusActionState } from "@/app/app/opportunities/actions";
 import { PLATFORM_LABELS } from "@/lib/schemas/creator";
@@ -47,8 +48,15 @@ function strengthReason(evidence: StoredOpportunity["evidence"]): string {
   return parts.filter(Boolean).join(", ");
 }
 
+/** Where a `planned` idea sits on the calendar, formatted server-side in the creator's timezone. */
+export interface PlannedSchedule {
+  /** "Wed, Oct 14, 9:00 AM", or null when its item no longer has a date. */
+  label: string | null;
+  href: string;
+}
+
 /** One opportunity as a decision: make it or not. Text only: React escapes everything. */
-export function OpportunityCard({ idea }: { idea: StoredOpportunity }) {
+export function OpportunityCard({ idea, schedule = null }: { idea: StoredOpportunity; schedule?: PlannedSchedule | null }) {
   const [state, action, pending] = useActionState(updateOpportunityStatusAction, IDLE);
   const headingId = `idea-${idea.id}`;
   const reason = strengthReason(idea.evidence);
@@ -139,6 +147,17 @@ export function OpportunityCard({ idea }: { idea: StoredOpportunity }) {
         <p className="text-sm">
           <span className="font-semibold">Next step:</span> {idea.cta}
         </p>
+      ) : null}
+
+      {idea.status === "planned" ? (
+        <div className="flex flex-col gap-2 min-[480px]:flex-row min-[480px]:items-center min-[480px]:gap-4">
+          <p className="text-sm font-semibold">
+            {schedule?.label ? `Scheduled for ${schedule.label}` : "Planned, not on a date"}
+          </p>
+          <Link href={schedule?.href ?? "/app/calendar"} className="btn btn-secondary btn-sm w-full min-[480px]:w-auto">
+            View in calendar
+          </Link>
+        </div>
       ) : null}
 
       <div className="flex flex-col gap-2 min-[480px]:flex-row">

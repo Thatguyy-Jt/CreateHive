@@ -1,7 +1,11 @@
 // Product map for the /app sidebar. Only "live" items link anywhere; "soon"
 // items are shown disabled until their route exists (AGENTS.md §14).
 export type NavItem =
-  | { label: string; status: "live"; href: "/app" | "/app/strategy" | "/app/opportunities" | "/app/research" | "/app/settings" }
+  | {
+      label: string;
+      status: "live";
+      href: "/app" | "/app/strategy" | "/app/opportunities" | "/app/research" | "/app/calendar" | "/app/settings";
+    }
   | { label: string; status: "soon" };
 
 export const navItems: NavItem[] = [
@@ -9,7 +13,7 @@ export const navItems: NavItem[] = [
   { label: "Strategy", status: "live", href: "/app/strategy" },
   { label: "Opportunities", status: "live", href: "/app/opportunities" },
   { label: "Research", status: "live", href: "/app/research" },
-  { label: "Calendar", status: "soon" },
+  { label: "Calendar", status: "live", href: "/app/calendar" },
   { label: "Studio", status: "soon" },
   { label: "Analytics", status: "soon" },
   { label: "Insights", status: "soon" },

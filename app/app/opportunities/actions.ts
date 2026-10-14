@@ -77,5 +77,7 @@ export async function updateOpportunityStatusAction(
   if (!result.ok) return { status: "error", message: result.message };
 
   revalidatePath("/app/opportunities");
+  // Saved ideas are listed on the calendar too.
+  revalidatePath("/app/calendar");
   return { status: "idle", message: null };
 }

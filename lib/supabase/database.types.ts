@@ -667,6 +667,7 @@ export type Database = {
           onboarding_status: string
           platforms: string[]
           posting_capacity_per_week: number | null
+          timezone: string | null
           updated_at: string
           user_id: string
         }
@@ -680,6 +681,7 @@ export type Database = {
           onboarding_status?: string
           platforms?: string[]
           posting_capacity_per_week?: number | null
+          timezone?: string | null
           updated_at?: string
           user_id: string
         }
@@ -693,6 +695,7 @@ export type Database = {
           onboarding_status?: string
           platforms?: string[]
           posting_capacity_per_week?: number | null
+          timezone?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -924,6 +927,14 @@ export type Database = {
       save_creator_strategy: {
         Args: { p_pillars: Json; p_strategy: Json }
         Returns: number
+      }
+      schedule_content_ideas: {
+        Args: { p_slots: Json }
+        Returns: number
+      }
+      unschedule_content_item: {
+        Args: { p_item_id: string }
+        Returns: undefined
       }
     }
     Enums: {

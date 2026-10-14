@@ -354,8 +354,8 @@ describe("listOpportunities", () => {
     return fakeSupabase({
       content_ideas: (query) => {
         if (query.options) {
-          const status = query.filters.find(([method, column]) => method === "eq" && column === "status")![2] as string;
-          return { count: counts[status] };
+          const statuses = query.filters.find(([method, column]) => method === "in" && column === "status")![2] as string[];
+          return { count: counts[statuses.join(",")] ?? counts[statuses[0]] };
         }
         return { data: rows };
       },
@@ -371,17 +371,59 @@ describe("listOpportunities", () => {
       ok: true,
       hasStrategy: true,
       counts: { new: 1, saved: 2, dismissed: 3 },
-      items: [{ ...Object.fromEntries(Object.entries(row).filter(([k]) => k !== "pillar")), pillar_name: "Quick workouts" }],
+      items: [
+        {
+          ...Object.fromEntries(Object.entries(row).filter(([k]) => k !== "pillar")),
+          pillar_name: "Quick workouts",
+          scheduled_for: null,
+        },
+      ],
     });
     const list = queries.find((q) => q.table === "content_ideas" && !q.options)!;
     expect(list.filters).toEqual(
       expect.arrayContaining([
         ["eq", "user_id", USER_ID],
-        ["eq", "status", "saved"],
+        ["in", "status", ["saved", "planned"]],
         ["order", "created_at", { ascending: false }],
         ["limit", 50],
       ]),
     );
+  });
+
+  it("includes planned ideas in Saved with their scheduled time, and counts them there", async () => {
+    const planned = {
+      ...row,
+      id: "planned",
+      status: "planned",
+      items: [
+        { status: "draft", scheduled_for: null },
+        { status: "scheduled", scheduled_for: "2026-10-15T08:00:00+00:00" },
+      ],
+    };
+    const undated = { ...planned, id: "undated", items: [{ status: "draft", scheduled_for: null }] };
+    const { client, queries } = listSetup([planned, undated, { ...row, status: "saved", items: [] }], {
+      new: 1,
+      "saved,planned": 3,
+      dismissed: 0,
+    });
+    const result = await listOpportunities(client, USER_ID, "saved");
+    expect(result.ok && result.counts).toEqual({ new: 1, saved: 3, dismissed: 0 });
+    expect(result.ok && result.items.map((item) => [item.id, item.status, item.scheduled_for])).toEqual([
+      ["planned", "planned", "2026-10-15T08:00:00+00:00"],
+      ["undated", "planned", null],
+      [IDEA_ID, "saved", null],
+    ]);
+    const savedCount = queries.find(
+      (q) => q.options && q.filters.some(([m, c, v]) => m === "in" && c === "status" && (v as string[]).includes("planned")),
+    );
+    expect(savedCount).toBeDefined();
+  });
+
+  it("keeps the other views to their own status", async () => {
+    const { client, queries } = listSetup([row]);
+    await listOpportunities(client, USER_ID, "new");
+    const list = queries.find((q) => q.table === "content_ideas" && !q.options)!;
+    expect(list.filters).toEqual(expect.arrayContaining([["in", "status", ["new"]]]));
   });
 
   it("skips rows whose evidence no longer validates, without failing the page", async () => {
@@ -441,7 +483,10 @@ describe("updateOpportunityStatus", () => {
   it.each([
     ["dismissed", "saved"],
     ["new", "planned"],
+    ["saved", "planned"],
     ["planned", "new"],
+    ["planned", "saved"],
+    ["planned", "dismissed"],
     ["unknown_status", "new"],
   ] as const)("rejects %s -> %s without writing", async (from, to) => {
     const { client, queries } = statusSetup({ status: from });
