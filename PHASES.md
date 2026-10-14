@@ -12,7 +12,7 @@ Mark a task `[x]` when it is finished. When every task in a phase is checked, ch
 |---|-------|--------|
 | 1 | Foundation | ✅ DONE |
 | 2 | Creator Intelligence | ✅ DONE |
-| 3 | Opportunity Engine | ⬜ Not done |
+| 3 | Opportunity Engine | ✅ DONE |
 | 4 | Content Studio | ⬜ Not done |
 | 5 | Analytics and Learning | ⬜ Not done |
 | 6 | Billing | ⬜ Not done |
@@ -53,18 +53,18 @@ Mark a task `[x]` when it is finished. When every task in a phase is checked, ch
 
 ## Phase 4 — Content Studio — ⬜ Not done
 
-- [ ] Content package generation (`generateContentPackage()`)
-- [ ] Hooks
-- [ ] Scripts
-- [ ] Shot lists
-- [ ] Captions
-- [ ] CTAs
-- [ ] Titles
-- [ ] Thumbnail concepts
-- [ ] Repurposing suggestions
+- [x] Content package generation (`generateContentPackage()`)
+- [x] Hooks
+- [x] Scripts
+- [x] Shot lists
+- [x] Captions
+- [x] CTAs
+- [x] Titles
+- [x] Thumbnail concepts
+- [x] Repurposing suggestions
 - [ ] Section-level regeneration
 - [ ] Save / edit / version (`content_items`, `content_versions`)
-- [ ] Studio routes (`/app/studio`, `/app/studio/[id]`)
+- [x] Studio routes (`/app/studio`, `/app/studio/[id]`)
 
 ## Phase 5 — Analytics and Learning — ⬜ Not done
 

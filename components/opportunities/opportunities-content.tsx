@@ -19,7 +19,7 @@ const VIEWS: { view: OpportunityView; label: string }[] = [
 
 const EMPTY: Record<OpportunityView, string> = {
   new: "No ideas waiting. Generate a batch based on your strategy.",
-  saved: "Ideas you save will show up here, including the ones on your calendar.",
+  saved: "Ideas you save will show up here, including the ones on your calendar or in Studio.",
   dismissed: "Nothing dismissed.",
 };
 

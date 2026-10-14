@@ -256,8 +256,8 @@ export async function listWeek(
 // Scheduling
 // ---------------------------------------------------------------------------
 
-/** The UTC instant for a local date/time, if it's inside the schedulable window. */
-function instantInWindow(
+/** The UTC instant for a local date/time, if it's inside the schedulable window. Shared with Studio. */
+export function instantInWindow(
   date: string,
   time: string,
   tz: string,

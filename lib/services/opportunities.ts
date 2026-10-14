@@ -310,12 +310,13 @@ export type ListOpportunitiesResult =
   | { ok: false };
 
 const LIST_COLUMNS =
-  "id, topic, audience_need, angle, hook, format, platform, rationale, cta, difficulty, audience_fit, evidence_strength, evidence, status, created_at, pillar:content_pillars(name), items:content_items(status, scheduled_for)";
+  "id, topic, audience_need, angle, hook, format, platform, rationale, cta, difficulty, audience_fit, evidence_strength, evidence, status, created_at, pillar:content_pillars(name), items:content_items(id, status, scheduled_for, created_at)";
 
 /**
  * The creator's ideas for one view, newest first, plus per-view counts and
  * whether they have a strategy to generate from. The Saved view includes
- * `planned` ideas with their scheduled time. Rows that no longer validate are
+ * `planned` ideas with their scheduled time and `in_production` ideas with
+ * their Studio item. Rows that no longer validate are
  * skipped and logged rather than breaking the page. Never throws.
  */
 export async function listOpportunities(
@@ -359,13 +360,18 @@ export async function listOpportunities(
     for (const row of list.data ?? []) {
       const { pillar, items: contentItems, ...rest } = row as typeof row & {
         pillar: { name: string } | null;
-        items: { status: string; scheduled_for: string | null }[] | null;
+        items: { id: string; status: string; scheduled_for: string | null; created_at: string }[] | null;
       };
       const scheduled = (contentItems ?? []).find((item) => item.status === "scheduled" && item.scheduled_for);
+      // Newest non-archived item, as `start_studio_item` returns it.
+      const studioItem = (contentItems ?? [])
+        .filter((item) => item.status !== "archived")
+        .toSorted((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
       const parsed = parseWith(storedOpportunity, {
         ...rest,
         pillar_name: pillar?.name ?? null,
         scheduled_for: rest.status === "planned" ? (scheduled?.scheduled_for ?? null) : null,
+        studio_item_id: rest.status === "in_production" ? (studioItem?.id ?? null) : null,
       });
       if (parsed.ok) items.push(parsed.data);
       else logEvent("warn", "opportunity_read_skipped", { stage: "validate" });

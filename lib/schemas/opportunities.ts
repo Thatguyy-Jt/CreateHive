@@ -164,14 +164,14 @@ export type GeneratedOpportunity = OpportunityOutput["opportunities"][number];
 // Triage
 // ---------------------------------------------------------------------------
 
-/** The page's views. `in_production` and `used` belong to studio. */
+/** The page's views. `used` belongs to studio. */
 export const opportunityView = z.enum(["new", "saved", "dismissed"]);
 export type OpportunityView = z.infer<typeof opportunityView>;
 
-/** Idea statuses each view lists: Saved also shows ideas already on the calendar. */
+/** Idea statuses each view lists: Saved also shows ideas on the calendar or in Studio. */
 export const VIEW_STATUSES: Record<OpportunityView, readonly [IdeaStatus, ...IdeaStatus[]]> = {
   new: ["new"],
-  saved: ["saved", "planned"],
+  saved: ["saved", "planned", "in_production"],
   dismissed: ["dismissed"],
 };
 
@@ -213,5 +213,7 @@ export const storedOpportunity = z.object({
   pillar_name: z.string().nullable(),
   /** For `planned` ideas: when its calendar item is scheduled, if it still has a date. */
   scheduled_for: z.string().nullable(),
+  /** For `in_production` ideas: the Studio item to open. */
+  studio_item_id: z.string().nullable(),
 });
 export type StoredOpportunity = z.infer<typeof storedOpportunity>;

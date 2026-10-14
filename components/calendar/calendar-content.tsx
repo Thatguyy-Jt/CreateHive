@@ -18,6 +18,7 @@ import { getCalendarSetup, listWeek, type CalendarItem } from "@/lib/services/ca
 import { WEEKLY_PLAN_ERRORS } from "@/lib/services/weekly-plan";
 import { createUserClient } from "@/lib/supabase/server";
 import { FinishSetupCard } from "../strategy/finish-setup-card";
+import { StartStudioForm } from "../studio/start-studio-form";
 import { CalendarItemCard } from "./calendar-item-card";
 import { ScheduleIdeaForm } from "./schedule-idea-form";
 import { TimezoneForm } from "./timezone-form";
@@ -261,6 +262,9 @@ export async function CalendarContent({
                       </blockquote>
                     ) : null}
                     <ScheduleIdeaForm ideaId={idea.id} defaultDate={defaultDate} min={today} max={latest} />
+                    <div className="border-t border-border pt-3">
+                      <StartStudioForm ideaId={idea.id} primary={false} />
+                    </div>
                   </article>
                 </li>
               );

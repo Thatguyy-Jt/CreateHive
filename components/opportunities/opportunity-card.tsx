@@ -5,7 +5,9 @@ import { useActionState } from "react";
 import { updateOpportunityStatusAction, type StatusActionState } from "@/app/app/opportunities/actions";
 import { PLATFORM_LABELS } from "@/lib/schemas/creator";
 import type { IdeaStatus, SignalLevel } from "@/lib/schemas/enums";
-import { EVIDENCE_KIND_LABELS, type StoredOpportunity } from "@/lib/schemas/opportunities";
+import type { StoredOpportunity } from "@/lib/schemas/opportunities";
+import { StartStudioForm } from "../studio/start-studio-form";
+import { EvidenceList } from "./evidence-list";
 
 const IDLE: StatusActionState = { status: "idle", message: null };
 
@@ -114,29 +116,7 @@ export function OpportunityCard({ idea, schedule = null }: { idea: StoredOpportu
             <div>
               <dt className="font-semibold">Evidence</dt>
               <dd>
-                <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
-                  {idea.evidence.map((item, index) => (
-                    <li key={index} className="break-words">
-                      <span className="font-semibold text-foreground">{EVIDENCE_KIND_LABELS[item.kind]}:</span>{" "}
-                      {item.summary}
-                      {item.source ? (
-                        <>
-                          {" "}
-                          (
-                          {item.source_url ? (
-                            <a href={item.source_url} target="_blank" rel="noopener noreferrer" className="link">
-                              {item.source}
-                              <span className="sr-only"> (opens in a new tab)</span>
-                            </a>
-                          ) : (
-                            item.source
-                          )}
-                          )
-                        </>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
+                <EvidenceList evidence={idea.evidence} />
               </dd>
             </div>
           ) : null}
@@ -159,6 +139,20 @@ export function OpportunityCard({ idea, schedule = null }: { idea: StoredOpportu
           </Link>
         </div>
       ) : null}
+
+      {idea.status === "in_production" ? (
+        <div className="flex flex-col gap-2 min-[480px]:flex-row min-[480px]:items-center min-[480px]:gap-4">
+          <p className="text-sm font-semibold">In Studio</p>
+          <Link
+            href={idea.studio_item_id ? `/app/studio/${idea.studio_item_id}` : "/app/studio"}
+            className="btn btn-secondary btn-sm w-full min-[480px]:w-auto"
+          >
+            Open in Studio
+          </Link>
+        </div>
+      ) : null}
+
+      {idea.status === "saved" ? <StartStudioForm ideaId={idea.id} /> : null}
 
       <div className="flex flex-col gap-2 min-[480px]:flex-row">
         {(ACTIONS[idea.status] ?? []).map((item) => (

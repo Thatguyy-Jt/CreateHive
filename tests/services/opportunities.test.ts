@@ -376,6 +376,7 @@ describe("listOpportunities", () => {
           ...Object.fromEntries(Object.entries(row).filter(([k]) => k !== "pillar")),
           pillar_name: "Quick workouts",
           scheduled_for: null,
+          studio_item_id: null,
         },
       ],
     });
@@ -383,7 +384,7 @@ describe("listOpportunities", () => {
     expect(list.filters).toEqual(
       expect.arrayContaining([
         ["eq", "user_id", USER_ID],
-        ["in", "status", ["saved", "planned"]],
+        ["in", "status", ["saved", "planned", "in_production"]],
         ["order", "created_at", { ascending: false }],
         ["limit", 50],
       ]),
@@ -403,7 +404,7 @@ describe("listOpportunities", () => {
     const undated = { ...planned, id: "undated", items: [{ status: "draft", scheduled_for: null }] };
     const { client, queries } = listSetup([planned, undated, { ...row, status: "saved", items: [] }], {
       new: 1,
-      "saved,planned": 3,
+      "saved,planned,in_production": 3,
       dismissed: 0,
     });
     const result = await listOpportunities(client, USER_ID, "saved");
@@ -417,6 +418,26 @@ describe("listOpportunities", () => {
       (q) => q.options && q.filters.some(([m, c, v]) => m === "in" && c === "status" && (v as string[]).includes("planned")),
     );
     expect(savedCount).toBeDefined();
+  });
+
+  it("includes in_production ideas in Saved with their newest non-archived Studio item", async () => {
+    const inStudio = {
+      ...row,
+      id: "studio",
+      status: "in_production",
+      items: [
+        { id: "item_old", status: "draft", scheduled_for: null, created_at: "2026-10-12T00:00:00Z" },
+        { id: "item_archived", status: "archived", scheduled_for: null, created_at: "2026-10-14T00:00:00Z" },
+        { id: "item_new", status: "draft", scheduled_for: null, created_at: "2026-10-13T00:00:00Z" },
+      ],
+    };
+    const planned = { ...row, id: "planned", status: "planned", items: [{ id: "item_p", status: "scheduled", scheduled_for: "2026-10-15T08:00:00+00:00", created_at: "2026-10-12T00:00:00Z" }] };
+    const { client } = listSetup([inStudio, planned]);
+    const result = await listOpportunities(client, USER_ID, "saved");
+    expect(result.ok && result.items.map((item) => [item.id, item.status, item.studio_item_id])).toEqual([
+      ["studio", "in_production", "item_new"],
+      ["planned", "planned", null],
+    ]);
   });
 
   it("keeps the other views to their own status", async () => {

@@ -1,0 +1,133 @@
+"use server";
+
+import { auth } from "@clerk/nextjs/server";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { z } from "zod";
+import { runStructured } from "@/lib/ai";
+import { logEvent } from "@/lib/observability/log";
+import { STUDIO_ERRORS } from "@/lib/schemas/studio";
+import { CALENDAR_ERRORS, getTimezone } from "@/lib/services/calendar";
+import { generateContentPackage, scheduleStudioItem, startStudioItem } from "@/lib/services/studio";
+import { createUserClient } from "@/lib/supabase/server";
+
+function userClient(event: string) {
+  try {
+    return createUserClient();
+  } catch (error) {
+    logEvent("error", event, { stage: "client", name: error instanceof Error ? error.name : typeof error });
+    return null;
+  }
+}
+
+const field = (formData: FormData, name: string) => {
+  const value = formData.get(name);
+  return typeof value === "string" ? value : "";
+};
+
+const idInput = z.uuid();
+
+export interface StartStudioState {
+  status: "idle" | "error";
+  message: string | null;
+}
+
+/** Opens Studio for a saved idea, creating its draft if needed, then goes to the item. */
+export async function startStudioItemAction(_previous: StartStudioState, formData: FormData): Promise<StartStudioState> {
+  // Public POST endpoint: identity only from Clerk's session.
+  const { userId } = await auth.protect();
+
+  const ideaId = idInput.safeParse(field(formData, "idea_id"));
+  if (!ideaId.success) return { status: "error", message: STUDIO_ERRORS.idea_not_found.message };
+
+  const client = userClient("studio_start_failed");
+  if (!client) return { status: "error", message: STUDIO_ERRORS.db_error.message };
+
+  const result = await startStudioItem(client, userId, ideaId.data);
+  if (!result.ok) return { status: "error", message: result.message };
+
+  // The idea moved to `in_production`: saved lists and the dashboard change.
+  revalidatePath("/app");
+  revalidatePath("/app/opportunities");
+  revalidatePath("/app/calendar");
+  revalidatePath("/app/studio");
+  // Outside any try: `redirect` works by throwing.
+  redirect(`/app/studio/${result.itemId}`);
+}
+
+export interface GeneratePackageState {
+  status: "idle" | "ok" | "error";
+  message: string | null;
+  retryable: boolean;
+  /** Changes on every result, so the control toasts once. */
+  submission: number;
+  versionNo?: number;
+}
+
+/** Creates (or regenerates) the package for one Studio item. Success re-renders the page. */
+export async function generatePackageAction(
+  previous: GeneratePackageState,
+  formData: FormData,
+): Promise<GeneratePackageState> {
+  const { userId } = await auth.protect();
+  const submission = previous.submission + 1;
+  const error = (message: string, retryable: boolean): GeneratePackageState => ({
+    status: "error",
+    message,
+    retryable,
+    submission,
+  });
+
+  const itemId = idInput.safeParse(field(formData, "item_id"));
+  if (!itemId.success) return error(STUDIO_ERRORS.not_found.message, false);
+
+  const client = userClient("content_package_failed");
+  if (!client) return error(STUDIO_ERRORS.persistence_error.message, true);
+
+  const result = await generateContentPackage(client, userId, itemId.data, { run: runStructured });
+  if (!result.ok) return error(result.message, result.retryable);
+
+  revalidatePath(`/app/studio/${itemId.data}`);
+  revalidatePath("/app/studio");
+  return { status: "ok", message: null, retryable: false, submission, versionNo: result.versionNo };
+}
+
+export interface ScheduleStudioState {
+  status: "idle" | "ok" | "error";
+  message: string | null;
+  submission: number;
+  /** On success: the local date scheduled, for the confirmation. */
+  date?: string;
+}
+
+/** Puts a Studio draft on the calendar at a local date and time in the creator's saved timezone. */
+export async function scheduleStudioItemAction(
+  previous: ScheduleStudioState,
+  formData: FormData,
+): Promise<ScheduleStudioState> {
+  const { userId } = await auth.protect();
+  const submission = previous.submission + 1;
+  const error = (message: string): ScheduleStudioState => ({ status: "error", message, submission });
+
+  const itemId = idInput.safeParse(field(formData, "item_id"));
+  if (!itemId.success) return error(STUDIO_ERRORS.not_found.message);
+
+  const client = userClient("studio_schedule_failed");
+  if (!client) return error(CALENDAR_ERRORS.db_error);
+
+  // The timezone comes from the database, never from the browser.
+  const tz = await getTimezone(client, userId);
+  if (!tz.ok) return error(tz.message);
+  if (!tz.timezone) return error(CALENDAR_ERRORS.missing_timezone);
+
+  const date = field(formData, "date");
+  const result = await scheduleStudioItem(client, userId, itemId.data, date, field(formData, "time"), tz.timezone);
+  if (!result.ok) return error(result.message);
+
+  revalidatePath("/app");
+  revalidatePath("/app/calendar");
+  revalidatePath("/app/opportunities");
+  revalidatePath("/app/studio");
+  revalidatePath(`/app/studio/${itemId.data}`);
+  return { status: "ok", message: null, submission, date };
+}

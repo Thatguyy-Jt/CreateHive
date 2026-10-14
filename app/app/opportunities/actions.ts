@@ -81,6 +81,7 @@ export async function updateOpportunityStatusAction(
   revalidatePath("/app/opportunities");
   // Saved ideas are listed on the calendar and drive the dashboard too.
   revalidatePath("/app/calendar");
+  revalidatePath("/app/studio");
   revalidatePath("/app");
   return { status: "idle", message: null };
 }

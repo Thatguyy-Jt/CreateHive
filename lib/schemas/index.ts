@@ -7,3 +7,4 @@ export * from "./json";
 export * from "./opportunities";
 export * from "./parse";
 export * from "./research";
+export * from "./studio";

@@ -4,7 +4,14 @@ export type NavItem =
   | {
       label: string;
       status: "live";
-      href: "/app" | "/app/strategy" | "/app/opportunities" | "/app/research" | "/app/calendar" | "/app/settings";
+      href:
+        | "/app"
+        | "/app/strategy"
+        | "/app/opportunities"
+        | "/app/research"
+        | "/app/calendar"
+        | "/app/studio"
+        | "/app/settings";
     }
   | { label: string; status: "soon" };
 
@@ -14,7 +21,7 @@ export const navItems: NavItem[] = [
   { label: "Opportunities", status: "live", href: "/app/opportunities" },
   { label: "Research", status: "live", href: "/app/research" },
   { label: "Calendar", status: "live", href: "/app/calendar" },
-  { label: "Studio", status: "soon" },
+  { label: "Studio", status: "live", href: "/app/studio" },
   { label: "Analytics", status: "soon" },
   { label: "Insights", status: "soon" },
   { label: "Settings", status: "live", href: "/app/settings" },

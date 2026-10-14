@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -90,7 +91,14 @@ export function CalendarItemCard({ item, min, max }: { item: CalendarItem; min: 
           </div>
         </form>
       ) : (
-        <div className="mt-auto flex flex-col gap-2 border-t border-border pt-3 min-[480px]:flex-row">
+        <div className="mt-auto flex flex-col gap-2 border-t border-border pt-3 min-[480px]:flex-row min-[480px]:flex-wrap">
+          <Link
+            href={`/app/studio/${item.id}`}
+            className="btn btn-secondary btn-sm w-full min-[480px]:w-auto"
+            aria-label={`Open ${item.title} in Studio`}
+          >
+            Open in Studio
+          </Link>
           <button
             type="button"
             className="btn btn-ghost btn-sm w-full min-[480px]:w-auto"

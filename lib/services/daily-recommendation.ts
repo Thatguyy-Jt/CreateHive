@@ -188,7 +188,12 @@ export async function getDailyRecommendation(
     const ideas: StoredOpportunity[] = [];
     for (const row of candidates.data ?? []) {
       const { pillar, ...rest } = row as typeof row & { pillar: { name: string } | null };
-      const parsed = parseWith(storedOpportunity, { ...rest, pillar_name: pillar?.name ?? null, scheduled_for: null });
+      const parsed = parseWith(storedOpportunity, {
+        ...rest,
+        pillar_name: pillar?.name ?? null,
+        scheduled_for: null,
+        studio_item_id: null,
+      });
       if (parsed.ok) ideas.push(parsed.data);
       else logEvent("warn", "daily_recommendation_skipped", { stage: "idea" });
     }

@@ -122,7 +122,12 @@ function TodayCard({ today, recommendation }: { today: string | null; recommenda
               {moreToday > 0 ? ` · and ${moreToday} more today` : null}
             </p>
           </div>
-          <PrimaryLink href="/app/calendar">Open your calendar</PrimaryLink>
+          <PrimaryLink href={`/app/studio/${item.id}`}>Open in Studio</PrimaryLink>
+          <p className="field-help">
+            <Link href="/app/calendar" className="link">
+              Or open your calendar
+            </Link>
+          </p>
         </TodayFrame>
       );
     }

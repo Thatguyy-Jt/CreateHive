@@ -501,6 +501,7 @@ export type Database = {
       }
       content_versions: {
         Row: {
+          ai_generation_id: string | null
           content: Json
           content_item_id: string
           created_at: string
@@ -511,6 +512,7 @@ export type Database = {
           version_no: number
         }
         Insert: {
+          ai_generation_id?: string | null
           content?: Json
           content_item_id: string
           created_at?: string
@@ -521,6 +523,7 @@ export type Database = {
           version_no: number
         }
         Update: {
+          ai_generation_id?: string | null
           content?: Json
           content_item_id?: string
           created_at?: string
@@ -931,6 +934,14 @@ export type Database = {
       schedule_content_ideas: {
         Args: { p_slots: Json }
         Returns: number
+      }
+      schedule_content_item: {
+        Args: { p_item_id: string; p_scheduled_for: string }
+        Returns: undefined
+      }
+      start_studio_item: {
+        Args: { p_idea_id: string }
+        Returns: string
       }
       unschedule_content_item: {
         Args: { p_item_id: string }

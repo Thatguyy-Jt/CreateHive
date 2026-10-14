@@ -33,6 +33,8 @@ function revalidate() {
   revalidatePath("/app/calendar");
   revalidatePath("/app/opportunities");
   revalidatePath("/app/settings");
+  // Studio lists scheduled items and drafts kept after unscheduling.
+  revalidatePath("/app/studio", "layout");
 }
 
 function userClient(event: string) {

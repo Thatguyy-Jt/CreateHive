@@ -2,11 +2,27 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Suspense } from "react";
 import { navItems } from "@/lib/app-shell/nav-items";
 
+/**
+ * Under a dynamic route (`/app/studio/[id]`) the pathname is only known at
+ * request time, so the active-link reader sits behind Suspense. The fallback
+ * is the same nav without an active link, so the shell still prerenders.
+ */
 export function SidebarNav({ label }: { label: string }) {
-  const pathname = usePathname();
+  return (
+    <Suspense fallback={<NavList label={label} pathname={null} />}>
+      <ActiveNav label={label} />
+    </Suspense>
+  );
+}
 
+function ActiveNav({ label }: { label: string }) {
+  return <NavList label={label} pathname={usePathname()} />;
+}
+
+function NavList({ label, pathname }: { label: string; pathname: string | null }) {
   return (
     <nav aria-label={label}>
       <ul className="grid gap-1 text-sm font-semibold">

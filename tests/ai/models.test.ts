@@ -13,6 +13,15 @@ describe("model routing", () => {
     });
   });
 
+  it("routes content packages to the quality tier with an 8k output ceiling", () => {
+    expect(routeTask("content_package")).toEqual({
+      tier: "quality",
+      modelId: "gpt-6.1-sol",
+      reasoning: "medium",
+      maxOutputTokens: 8_000,
+    });
+  });
+
   it("has a route for every prompt kind and a prompt for every route", () => {
     expect(Object.keys(AI_TASK_ROUTES).sort()).toEqual(Object.keys(ACTIVE_PROMPTS).sort());
   });
