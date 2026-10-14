@@ -172,6 +172,14 @@ describe("listWeek", () => {
     expect(warnLog.mock.calls.flat().join(" ")).toContain("calendar_read_skipped");
   });
 
+  it("skips the saved-ideas query when the limit is 0", async () => {
+    const { client, queries } = fakeSupabase({ content_items: { data: [itemRow()] } });
+    const result = await listWeek(client, USER_ID, "2026-10-12", TZ, NOW, 0);
+    expect(result.ok && result.items.map((i) => i.id)).toEqual([ITEM_ID]);
+    expect(result.ok && result.unscheduled).toEqual([]);
+    expect(queries.map((q) => q.table)).toEqual(["content_items"]);
+  });
+
   it("returns ok: false on a read error or an invalid zone", async () => {
     const { client } = fakeSupabase({ content_items: { error: pgError() }, content_ideas: { data: [] } });
     await expect(listWeek(client, USER_ID, "2026-10-12", TZ, NOW)).resolves.toEqual({ ok: false });

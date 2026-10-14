@@ -209,6 +209,12 @@ export function formatWeekday(key: string): string | null {
   return ms === null ? null : weekdayFormat.format(ms);
 }
 
+/** "Wednesday, Oct 14". */
+export function formatLongDay(key: string): string | null {
+  const ms = parseDateKey(key);
+  return ms === null ? null : `${weekdayFormat.format(ms)}, ${monthDayFormat.format(ms)}`;
+}
+
 /** "Oct 12 to 18", or "Sep 28 to Oct 4" across months. */
 export function formatWeekRange(startKey: string): string | null {
   const start = parseDateKey(startKey);

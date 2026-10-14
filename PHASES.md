@@ -42,14 +42,14 @@ Mark a task `[x]` when it is finished. When every task in a phase is checked, ch
 - [x] Persistent strategy (pillars, positioning, 30-day plan) at `/app/strategy`
 - [x] Creator context builder
 
-## Phase 3 — Opportunity Engine — ⬜ Not done
+## Phase 3 — Opportunity Engine — ✅ DONE
 
 - [x] Opportunities (`generateContentOpportunities()`, `content_ideas`)
 - [x] Evidence / signals (`research_signals`)
-- [ ] Daily recommendations
+- [x] Daily recommendations (`getDailyRecommendation()`)
 - [x] Calendar (`/app/calendar`)
 - [x] Weekly planning (`generateWeeklyPlan()`)
-- [ ] Dashboard: "What should I do today?" (`/app`)
+- [x] Dashboard: "What should I do today?" (`/app`)
 
 ## Phase 4 — Content Studio — ⬜ Not done
 

@@ -3,6 +3,7 @@ import { AI_ERRORS, type AiErrorCode } from "@/lib/ai/errors";
 import type { WeeklyPlanDay, WeeklyPlanIdea } from "@/lib/ai/prompts/weekly_plan/v1";
 import type { AiResult, RunStructuredRequest } from "@/lib/ai/run-structured";
 import { daysBetween, formatWeekday, isDateKey, localDateKey, weekDays, weekStart } from "@/lib/calendar/dates";
+import { planWeekNumber } from "@/lib/calendar/plan-week";
 import { logEvent } from "@/lib/observability/log";
 import {
   DEFAULT_TIME,
@@ -89,16 +90,6 @@ export interface WeeklyPlanDeps {
   /** `runStructured` from `@/lib/ai`; injected so tests never reach a provider. */
   run: RunWeeklyPlan;
   now?: () => number;
-}
-
-/** The 30-day plan week the target week falls in, counted from the Monday of the week the strategy was saved. */
-function planWeekNumber(strategySavedAt: string, targetWeek: string, tz: string): number | null {
-  const savedDay = localDateKey(strategySavedAt, tz);
-  const start = savedDay ? weekStart(savedDay) : null;
-  const days = start ? daysBetween(start, targetWeek) : null;
-  if (days === null || days < 0) return null;
-  const week = Math.floor(days / 7) + 1;
-  return week <= 4 ? week : null;
 }
 
 /**

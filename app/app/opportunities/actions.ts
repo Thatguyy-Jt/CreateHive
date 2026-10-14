@@ -42,6 +42,8 @@ export async function generateOpportunitiesAction(): Promise<GenerateOpportuniti
   if (!result.ok) return { status: "error", message: result.message, retryable: result.retryable, created: 0 };
 
   revalidatePath("/app/opportunities");
+  // New ideas change the dashboard's recommendation.
+  revalidatePath("/app");
   return { status: "ok", message: null, retryable: false, created: result.created };
 }
 
@@ -77,7 +79,8 @@ export async function updateOpportunityStatusAction(
   if (!result.ok) return { status: "error", message: result.message };
 
   revalidatePath("/app/opportunities");
-  // Saved ideas are listed on the calendar too.
+  // Saved ideas are listed on the calendar and drive the dashboard too.
   revalidatePath("/app/calendar");
+  revalidatePath("/app");
   return { status: "idle", message: null };
 }

@@ -28,6 +28,8 @@ export interface CalendarActionState {
 }
 
 function revalidate() {
+  // The dashboard's recommendation reads the calendar and saved ideas.
+  revalidatePath("/app");
   revalidatePath("/app/calendar");
   revalidatePath("/app/opportunities");
   revalidatePath("/app/settings");

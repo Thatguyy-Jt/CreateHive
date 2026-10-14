@@ -178,7 +178,8 @@ const IDEA_COLUMNS = "id, topic, hook, format, platform, difficulty, pillar:cont
 /**
  * The creator's scheduled items in one week (Monday to Sunday in `tz`), in
  * time order, plus their saved ideas that aren't scheduled yet. Rows that no
- * longer validate are skipped and logged. Never throws.
+ * longer validate are skipped and logged. An `unscheduledLimit` of 0 skips
+ * the saved-ideas query. Never throws.
  */
 export async function listWeek(
   client: ReadClient,
@@ -200,15 +201,18 @@ export async function listWeek(
         .gte("scheduled_for", range.from)
         .lt("scheduled_for", range.to)
         .order("scheduled_for", { ascending: true }),
-      client
-        .from("content_ideas")
-        .select(IDEA_COLUMNS)
-        .eq("user_id", userId)
-        .eq("status", "saved")
-        .order("created_at", { ascending: false })
-        .limit(unscheduledLimit),
+      // A limit of 0 means the caller only needs the week's items.
+      unscheduledLimit > 0
+        ? client
+            .from("content_ideas")
+            .select(IDEA_COLUMNS)
+            .eq("user_id", userId)
+            .eq("status", "saved")
+            .order("created_at", { ascending: false })
+            .limit(unscheduledLimit)
+        : null,
     ]);
-    const error = items.error ?? ideas.error;
+    const error = items.error ?? ideas?.error;
     if (error) {
       logEvent("error", "calendar_read_failed", { stage: "select", db_code: error.code });
       return { ok: false };
@@ -231,7 +235,7 @@ export async function listWeek(
     }
 
     const unscheduled: UnscheduledIdea[] = [];
-    for (const row of ideas.data ?? []) {
+    for (const row of ideas?.data ?? []) {
       const { pillar, ...rest } = row as typeof row & { pillar: { name: string } | null };
       const parsed = parseWith(unscheduledIdea, { ...rest, pillar_name: pillar?.name ?? null });
       if (parsed.ok) unscheduled.push(parsed.data);
