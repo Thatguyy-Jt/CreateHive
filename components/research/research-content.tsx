@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
+import { connection } from "next/server";
 import { logEvent } from "@/lib/observability/log";
 import { listSignals } from "@/lib/services/research-signals";
 import { getYouTubeStatus, type YouTubeStatus } from "@/lib/services/youtube-refresh";
@@ -31,6 +32,10 @@ async function youtubeStatus(client: ReturnType<typeof createUserClient>, userId
 
 /** Session-bound part of /app/research: add form, YouTube research and the creator's signals. */
 export async function ResearchContent() {
+  // Signal expiry and YouTube refresh status depend on the current time, so
+  // this must never be prerendered. Clerk's session read alone doesn't tell
+  // Next that; `connection()` does.
+  await connection();
   const { userId } = await auth.protect();
 
   let client;
