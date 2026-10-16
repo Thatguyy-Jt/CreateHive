@@ -298,6 +298,54 @@ export type Database = {
           },
         ]
       }
+      content_diagnoses: {
+        Row: {
+          ai_generation_id: string | null
+          content_item_id: string
+          created_at: string
+          diagnosis: Json
+          id: string
+          prompt_version: string
+          snapshot_id: string | null
+          user_id: string
+        }
+        Insert: {
+          ai_generation_id?: string | null
+          content_item_id: string
+          created_at?: string
+          diagnosis: Json
+          id?: string
+          prompt_version: string
+          snapshot_id?: string | null
+          user_id: string
+        }
+        Update: {
+          ai_generation_id?: string | null
+          content_item_id?: string
+          created_at?: string
+          diagnosis?: Json
+          id?: string
+          prompt_version?: string
+          snapshot_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_diagnoses_content_item_id_user_id_fkey"
+            columns: ["content_item_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "content_items"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "content_diagnoses_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       content_ideas: {
         Row: {
           ai_generation_id: string | null
@@ -391,7 +439,9 @@ export type Database = {
       content_items: {
         Row: {
           created_at: string
+          duration_seconds: number | null
           format: string | null
+          hook_used: string | null
           id: string
           idea_id: string | null
           pillar_id: string | null
@@ -406,7 +456,9 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          duration_seconds?: number | null
           format?: string | null
+          hook_used?: string | null
           id?: string
           idea_id?: string | null
           pillar_id?: string | null
@@ -421,7 +473,9 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          duration_seconds?: number | null
           format?: string | null
+          hook_used?: string | null
           id?: string
           idea_id?: string | null
           pillar_id?: string | null
@@ -597,6 +651,59 @@ export type Database = {
           },
         ]
       }
+      creator_profiles: {
+        Row: {
+          audience_description: string | null
+          created_at: string
+          experience_level: string | null
+          goals: string[]
+          id: string
+          niche: string | null
+          onboarding_status: string
+          platforms: string[]
+          posting_capacity_per_week: number | null
+          timezone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          audience_description?: string | null
+          created_at?: string
+          experience_level?: string | null
+          goals?: string[]
+          id?: string
+          niche?: string | null
+          onboarding_status?: string
+          platforms?: string[]
+          posting_capacity_per_week?: number | null
+          timezone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          audience_description?: string | null
+          created_at?: string
+          experience_level?: string | null
+          goals?: string[]
+          id?: string
+          niche?: string | null
+          onboarding_status?: string
+          platforms?: string[]
+          posting_capacity_per_week?: number | null
+          timezone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       creator_strategies: {
         Row: {
           ai_generation_id: string | null
@@ -652,59 +759,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "creator_strategies_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: true
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      creator_profiles: {
-        Row: {
-          audience_description: string | null
-          created_at: string
-          experience_level: string | null
-          goals: string[]
-          id: string
-          niche: string | null
-          onboarding_status: string
-          platforms: string[]
-          posting_capacity_per_week: number | null
-          timezone: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          audience_description?: string | null
-          created_at?: string
-          experience_level?: string | null
-          goals?: string[]
-          id?: string
-          niche?: string | null
-          onboarding_status?: string
-          platforms?: string[]
-          posting_capacity_per_week?: number | null
-          timezone?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          audience_description?: string | null
-          created_at?: string
-          experience_level?: string | null
-          goals?: string[]
-          id?: string
-          niche?: string | null
-          onboarding_status?: string
-          platforms?: string[]
-          posting_capacity_per_week?: number | null
-          timezone?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "creator_profiles_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: true
             referencedRelation: "users"
@@ -927,26 +981,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      discard_studio_item: {
-        Args: { p_item_id: string }
+      discard_studio_item: { Args: { p_item_id: string }; Returns: undefined }
+      publish_content_item: {
+        Args: {
+          p_duration_seconds?: number
+          p_hook_used?: string
+          p_item_id: string
+          p_published_at: string
+          p_published_url?: string
+        }
         Returns: undefined
       }
       save_creator_strategy: {
         Args: { p_pillars: Json; p_strategy: Json }
         Returns: number
       }
-      schedule_content_ideas: {
-        Args: { p_slots: Json }
-        Returns: number
-      }
+      schedule_content_ideas: { Args: { p_slots: Json }; Returns: number }
       schedule_content_item: {
         Args: { p_item_id: string; p_scheduled_for: string }
         Returns: undefined
       }
-      start_studio_item: {
-        Args: { p_idea_id: string }
-        Returns: string
-      }
+      start_studio_item: { Args: { p_idea_id: string }; Returns: string }
       unschedule_content_item: {
         Args: { p_item_id: string }
         Returns: undefined

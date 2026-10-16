@@ -71,6 +71,9 @@
   --warning: #9a5b00;
   --danger: #c2410c;
   --offset-shadow-color: var(--color-tint-sky);
+  /* Charts (validated with the dataviz palette script): one accent series, gray for de-emphasis. */
+  --chart-accent: var(--color-signal-600);
+  --chart-muted: var(--color-neutral-400);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -93,6 +96,8 @@
     --warning: #f5c56b;
     --danger: #fb8a5c;
     --offset-shadow-color: var(--color-ink-700);
+    --chart-accent: var(--color-signal-600);
+    --chart-muted: #5d706b;
   }
 }
 

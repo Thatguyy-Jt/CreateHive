@@ -68,9 +68,9 @@ Mark a task `[x]` when it is finished. When every task in a phase is checked, ch
 
 ## Phase 5 — Analytics and Learning — ⬜ Not done
 
-- [ ] Analytics import / manual entry
-- [ ] Performance snapshots (`analytics_snapshots`)
-- [ ] AI diagnosis (`analyzeContentPerformance()`)
+- [x] Analytics import / manual entry
+- [x] Performance snapshots (`analytics_snapshots`)
+- [x] AI diagnosis (`analyzeContentPerformance()`)
 - [ ] Creator insights (`creator_insights`, `updateCreatorInsights()`)
 - [ ] Learning feedback loop into recommendations
 - [ ] Analytics and insights routes (`/app/analytics`, `/app/insights`)

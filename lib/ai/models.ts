@@ -29,6 +29,7 @@ export const AI_TASK_ROUTES: Record<AiKind, TaskRoute> = {
   weekly_plan: { tier: "quality", maxOutputTokens: 3_000 },
   content_package: { tier: "quality", maxOutputTokens: 8_000 },
   content_section: { tier: "quality", maxOutputTokens: 4_000 },
+  content_diagnosis: { tier: "quality", maxOutputTokens: 3_000 },
 };
 
 export interface ResolvedRoute {

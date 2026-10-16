@@ -18,6 +18,8 @@ import {
   type VersionSummary,
 } from "@/lib/services/studio";
 import { createUserClient } from "@/lib/supabase/server";
+import { postDateRange } from "@/lib/schemas/analytics";
+import { PublishForm } from "../analytics/publish-form";
 import { EvidenceList } from "../opportunities/evidence-list";
 import { GeneratePackageControl } from "./generate-package-control";
 import { LoadError } from "./load-error";
@@ -28,10 +30,15 @@ import { RestoreVersionForm } from "./restore-version-form";
 import { ScheduleDraftForm } from "./schedule-draft-form";
 import { SOURCE_LABELS, VersionHistory, versionTime } from "./version-history";
 
-function HeaderCard({ item }: { item: StudioItem }) {
+function HeaderCard({ item, tz }: { item: StudioItem; tz: string | null }) {
   const meta = [item.platform ? PLATFORM_LABELS[item.platform] : null, item.format].filter(Boolean).join(" · ");
+  const posted = item.status === "published" && item.published_at && tz ? localDateKey(item.published_at, tz) : null;
   const when =
-    item.status === "scheduled"
+    item.status === "published"
+      ? posted
+        ? `Posted ${formatDay(posted)}`
+        : "Published"
+      : item.status === "scheduled"
       ? item.date && item.time
         ? `Scheduled for ${formatDay(item.date)}, ${formatTime(item.time)}`
         : "Scheduled"
@@ -85,6 +92,15 @@ function HeaderCard({ item }: { item: StudioItem }) {
 }
 
 function NextAction({ item, tz }: { item: StudioItem; tz: string | null }) {
+  if (item.status === "published") {
+    return (
+      <div>
+        <Link href={`/app/analytics/${item.id}`} className="btn btn-primary w-full min-[480px]:w-auto">
+          View results
+        </Link>
+      </div>
+    );
+  }
   if (item.status === "scheduled") {
     return (
       <div>
@@ -111,6 +127,46 @@ function NextAction({ item, tz }: { item: StudioItem; tz: string | null }) {
           defaultDate={addDays(today, 1) ?? today}
           min={today}
           max={addDays(today, MAX_DAYS_AHEAD) ?? today}
+        />
+      ) : (
+        <p className="text-muted-foreground">
+          Confirm your timezone on the{" "}
+          <Link href="/app/calendar" className="link">
+            calendar
+          </Link>{" "}
+          first, so the date lines up with your week.
+        </p>
+      )}
+    </section>
+  );
+}
+
+/** The current hour in `tz`, as "HH:00". */
+function currentHour(tz: string): string {
+  const time = localTimeKey(Date.now(), tz);
+  return time ? `${time.slice(0, 2)}:00` : "12:00";
+}
+
+/** "Posted it?": marks a draft or scheduled item as published, with the hook prefilled from the package. */
+function PublishCard({ item, tz }: { item: StudioItem; tz: string | null }) {
+  if (!(EDITABLE_STATUSES as readonly string[]).includes(item.status)) return null;
+  const today = tz ? todayIn(tz) : null;
+  // The scheduled slot, unless it is still ahead: a post can't be dated in the future.
+  const scheduled = item.date && item.time && today && item.date <= today ? { date: item.date, time: item.time } : null;
+  return (
+    <section id="publish" className="card stack-sm scroll-mt-24" aria-labelledby="studio-publish">
+      <h2 id="studio-publish" className="text-heading">
+        Posted it? Mark as published
+      </h2>
+      <p className="field-help">Then add your results to see how it compares with your usual numbers.</p>
+      {today && tz ? (
+        <PublishForm
+          itemId={item.id}
+          defaultDate={scheduled?.date ?? today}
+          defaultTime={scheduled?.time ?? currentHour(tz)}
+          defaultHook={item.version?.package?.hooks[0]?.text ?? null}
+          video={formatRulesFor(item.platform, item.format).video}
+          {...postDateRange(today)}
         />
       ) : (
         <p className="text-muted-foreground">
@@ -303,7 +359,7 @@ export async function StudioItemContent({
 
   return (
     <div className="stack-lg">
-      <HeaderCard item={item} />
+      <HeaderCard item={item} tz={tz} />
       {item.missingVersion ? (
         <section className="card stack-sm" aria-labelledby="studio-missing-version">
           <h2 id="studio-missing-version" className="text-heading">
@@ -320,6 +376,7 @@ export async function StudioItemContent({
       ) : (
         <>
           <NextAction item={item} tz={tz} />
+          <PublishCard item={item} tz={tz} />
           <PackageArea item={item} versions={versions} tz={tz} />
         </>
       )}

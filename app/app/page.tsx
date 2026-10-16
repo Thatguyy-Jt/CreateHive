@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { AiUsageLine, AiUsageLineFallback } from "@/components/dashboard/ai-usage-line";
 import { ComingSoonCards } from "@/components/dashboard/coming-soon-cards";
+import { PerformanceCard } from "@/components/dashboard/performance-card";
 import { DashboardToday } from "@/components/dashboard/today-card";
 import { SectionSkeleton } from "@/components/settings/section-skeleton";
 import { DashboardStrategyCard } from "@/components/strategy/dashboard-strategy-card";
@@ -45,7 +46,12 @@ export default function DashboardPage() {
       <Suspense fallback={<AiUsageLineFallback />}>
         <AiUsageLine />
       </Suspense>
-      <ComingSoonCards />
+      <div className="grid gap-4 md:grid-cols-2">
+        <Suspense fallback={<CardSkeleton lines={3} />}>
+          <PerformanceCard />
+        </Suspense>
+        <ComingSoonCards />
+      </div>
     </div>
   );
 }

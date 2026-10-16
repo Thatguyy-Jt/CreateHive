@@ -1,3 +1,4 @@
+import { contentDiagnosisV1 } from "./content_diagnosis/v1";
 import { contentOpportunitiesV2 } from "./content_opportunities/v2";
 import { contentPackageV1 } from "./content_package/v1";
 import { contentSectionV1 } from "./content_section/v1";
@@ -16,6 +17,7 @@ export const ACTIVE_PROMPTS = {
   weekly_plan: weeklyPlanV1,
   content_package: contentPackageV1,
   content_section: contentSectionV1,
+  content_diagnosis: contentDiagnosisV1,
 } as const;
 
 export type AiKind = keyof typeof ACTIVE_PROMPTS;

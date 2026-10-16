@@ -97,7 +97,7 @@ const storedContent = (pkg: StudioPackage) => ({ schema_version: STUDIO_PACKAGE_
 // ---------------------------------------------------------------------------
 
 const ITEM_COLUMNS =
-  "id, title, platform, format, status, scheduled_for, pillar:content_pillars(name), idea:content_ideas(topic, audience_need, angle, hook, rationale, cta, evidence)";
+  "id, title, platform, format, status, scheduled_for, published_at, pillar:content_pillars(name), idea:content_ideas(topic, audience_need, angle, hook, rationale, cta, evidence)";
 
 const itemRow = z.object({
   id: z.string(),
@@ -106,6 +106,7 @@ const itemRow = z.object({
   format: z.string().nullable(),
   status: contentItemStatus,
   scheduled_for: z.string().nullable(),
+  published_at: z.string().nullable().default(null),
   pillar: z.object({ name: z.string() }).nullable(),
   idea: z
     .object({
@@ -127,6 +128,7 @@ interface LoadedItem {
   format: string | null;
   status: ContentItemStatus;
   scheduled_for: string | null;
+  published_at: string | null;
   pillar_name: string | null;
   idea: {
     topic: string;

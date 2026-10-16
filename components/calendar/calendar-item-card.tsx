@@ -99,6 +99,13 @@ export function CalendarItemCard({ item, min, max }: { item: CalendarItem; min: 
           >
             Open in Studio
           </Link>
+          <Link
+            href={`/app/studio/${item.id}#publish`}
+            className="btn btn-ghost btn-sm w-full min-[480px]:w-auto"
+            aria-label={`Mark ${item.title} as published`}
+          >
+            Mark as published
+          </Link>
           <button
             type="button"
             className="btn btn-ghost btn-sm w-full min-[480px]:w-auto"

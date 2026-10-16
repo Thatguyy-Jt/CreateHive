@@ -45,6 +45,7 @@ export const CORE_TABLES = [
   "usage_events",
   "notifications",
   "creator_strategies",
+  "content_diagnoses",
 ] as const;
 
 /** A valid `creator_strategies` row's JSON columns, as strings for parameterized inserts. */
@@ -210,6 +211,12 @@ export async function seedCreator(db: PGlite, userId: string): Promise<Fixture> 
       growth_objective: "Grow",
       monetization_objective: "Earn",
       ...STRATEGY_JSON,
+    }),
+    content_diagnoses: await id("content_diagnoses", {
+      user_id: userId,
+      content_item_id: itemId,
+      prompt_version: "v1",
+      diagnosis: JSON.stringify({ schema_version: 1 }),
     }),
   };
 

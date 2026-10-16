@@ -11,6 +11,7 @@ export type NavItem =
         | "/app/research"
         | "/app/calendar"
         | "/app/studio"
+        | "/app/analytics"
         | "/app/settings";
     }
   | { label: string; status: "soon" };
@@ -22,7 +23,7 @@ export const navItems: NavItem[] = [
   { label: "Research", status: "live", href: "/app/research" },
   { label: "Calendar", status: "live", href: "/app/calendar" },
   { label: "Studio", status: "live", href: "/app/studio" },
-  { label: "Analytics", status: "soon" },
+  { label: "Analytics", status: "live", href: "/app/analytics" },
   { label: "Insights", status: "soon" },
   { label: "Settings", status: "live", href: "/app/settings" },
 ];

@@ -247,5 +247,6 @@ export async function discardStudioItemAction(_previous: VersionActionState, for
   revalidatePath("/app/opportunities");
   revalidatePath("/app/calendar");
   revalidatePath("/app/studio", "layout");
+  revalidatePath("/app/analytics");
   redirect("/app/studio");
 }

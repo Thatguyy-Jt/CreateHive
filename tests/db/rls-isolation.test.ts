@@ -162,6 +162,18 @@ const SPECS: TableSpec[] = [
     }),
   },
   {
+    table: "content_diagnoses",
+    ops: ["select", "insert", "delete"],
+    ownerCol: "user_id",
+    update: { prompt_version: "v9" },
+    payload: (f) => ({
+      user_id: f.userId,
+      content_item_id: f.itemId,
+      prompt_version: "v1",
+      diagnosis: JSON.stringify({ schema_version: 1 }),
+    }),
+  },
+  {
     table: "notifications",
     ops: ["select", "update", "delete"],
     ownerCol: "user_id",

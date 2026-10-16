@@ -35,6 +35,7 @@ function revalidate() {
   revalidatePath("/app/settings");
   // Studio lists scheduled items and drafts kept after unscheduling.
   revalidatePath("/app/studio", "layout");
+  revalidatePath("/app/analytics");
 }
 
 function userClient(event: string) {

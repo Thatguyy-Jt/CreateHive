@@ -22,18 +22,28 @@ export function PrivacySection() {
           of it, until you discard that item. Discarding a draft deletes it and all its versions. Only you can see them.
         </li>
         <li>
+          We store the posts you mark as published or log in Analytics (title, platform, format, date, link, the hook you
+          used and the length), every set of results you enter for them and every AI diagnosis of them, until you
+          delete that post. Deleting a post deletes its results and diagnoses, and its Studio package if it has one. We
+          never open your links. Only you can see them.
+        </li>
+        <li>
           We store the research signals you paste until you delete them. YouTube videos fetched for you are deleted
           after 7 days. To look them up, we send YouTube your niche and one content pillar, nothing else.
         </li>
         <li>
           To produce a result, the details you submit are sent to OpenAI: for your strategy, your profile and brand
-          voice; for content ideas, also your strategy, pillars, the topics of your earlier ideas and a short excerpt of
-          up to 12 research signals; for a suggested week, your posting capacity, platforms, your strategy&apos;s cadence
+          voice; for content ideas, also your strategy, pillars, the titles of your recent content, your results and learned
+          insights, the topics of your earlier ideas and a short excerpt of up to 12 research signals; for a suggested week, your posting capacity, platforms, your strategy&apos;s cadence
           and weekly theme, what&apos;s already on that week, and the topic, pillar, format and hook of up to 30 saved
           ideas; for a content package, your profile, brand voice, pillars and strategy, the titles of your recent
           content, your performance snapshots and learned insights, and the idea&apos;s topic, audience, angle, hook,
           call to action and evidence summaries; to regenerate one section, the same plus your current package and
-          the change you asked for, if any. Never your name or email. We ask OpenAI not to store those responses.
+          the change you asked for, if any; to diagnose a post, your profile, brand voice, pillars and strategy, the
+          post&apos;s title, format, pillar, posting day and hour, the hook you used, its length, its results and your
+          usual numbers, its idea and the planned hook and call to action from its package, and the titles, formats,
+          hooks, lengths and results of up to 12 of your other posts on that platform. The links you record for
+          published posts are never sent. Never your name or email. We ask OpenAI not to store those responses.
         </li>
         <li>
           If something breaks, an error report goes to our monitoring service (Sentry) with cookies, request details
