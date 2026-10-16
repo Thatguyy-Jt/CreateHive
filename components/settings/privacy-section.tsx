@@ -18,8 +18,8 @@ export function PrivacySection() {
           it. Only you can see them.
         </li>
         <li>
-          We store each content package we create for you in Studio, and every earlier package for the same item,
-          until that item is deleted. Only you can see them.
+          We store each content package we create for you in Studio, every edit you save and every earlier version
+          of it, until you discard that item. Discarding a draft deletes it and all its versions. Only you can see them.
         </li>
         <li>
           We store the research signals you paste until you delete them. YouTube videos fetched for you are deleted
@@ -32,7 +32,8 @@ export function PrivacySection() {
           and weekly theme, what&apos;s already on that week, and the topic, pillar, format and hook of up to 30 saved
           ideas; for a content package, your profile, brand voice, pillars and strategy, the titles of your recent
           content, your performance snapshots and learned insights, and the idea&apos;s topic, audience, angle, hook,
-          call to action and evidence summaries. Never your name or email. We ask OpenAI not to store those responses.
+          call to action and evidence summaries; to regenerate one section, the same plus your current package and
+          the change you asked for, if any. Never your name or email. We ask OpenAI not to store those responses.
         </li>
         <li>
           If something breaks, an error report goes to our monitoring service (Sentry) with cookies, request details

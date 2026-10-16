@@ -13,7 +13,7 @@ Mark a task `[x]` when it is finished. When every task in a phase is checked, ch
 | 1 | Foundation | ✅ DONE |
 | 2 | Creator Intelligence | ✅ DONE |
 | 3 | Opportunity Engine | ✅ DONE |
-| 4 | Content Studio | ⬜ Not done |
+| 4 | Content Studio | ✅ DONE |
 | 5 | Analytics and Learning | ⬜ Not done |
 | 6 | Billing | ⬜ Not done |
 | 7 | Reliability | ⬜ Not done |
@@ -51,7 +51,7 @@ Mark a task `[x]` when it is finished. When every task in a phase is checked, ch
 - [x] Weekly planning (`generateWeeklyPlan()`)
 - [x] Dashboard: "What should I do today?" (`/app`)
 
-## Phase 4 — Content Studio — ⬜ Not done
+## Phase 4 — Content Studio — ✅ DONE
 
 - [x] Content package generation (`generateContentPackage()`)
 - [x] Hooks
@@ -62,8 +62,8 @@ Mark a task `[x]` when it is finished. When every task in a phase is checked, ch
 - [x] Titles
 - [x] Thumbnail concepts
 - [x] Repurposing suggestions
-- [ ] Section-level regeneration
-- [ ] Save / edit / version (`content_items`, `content_versions`)
+- [x] Section-level regeneration
+- [x] Save / edit / version (`content_items`, `content_versions`)
 - [x] Studio routes (`/app/studio`, `/app/studio/[id]`)
 
 ## Phase 5 — Analytics and Learning — ⬜ Not done

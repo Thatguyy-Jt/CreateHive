@@ -2,18 +2,31 @@ import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
-import { addDays, formatDay, formatTime, todayIn } from "@/lib/calendar/dates";
+import { addDays, formatDay, formatTime, localDateKey, localTimeKey, todayIn } from "@/lib/calendar/dates";
 import { logEvent } from "@/lib/observability/log";
 import { MAX_DAYS_AHEAD } from "@/lib/schemas/calendar";
 import { PLATFORM_LABELS } from "@/lib/schemas/creator";
 import { getTimezone } from "@/lib/services/calendar";
-import { EDITABLE_STATUSES, getStudioItem, type StudioItem } from "@/lib/services/studio";
+import { downloadFileName, formatRulesFor, packageToText } from "@/lib/schemas/studio";
+import {
+  EDITABLE_STATUSES,
+  getStudioItem,
+  listVersions,
+  regenerableSections,
+  type StudioItem,
+  type StudioVersion,
+  type VersionSummary,
+} from "@/lib/services/studio";
 import { createUserClient } from "@/lib/supabase/server";
 import { EvidenceList } from "../opportunities/evidence-list";
 import { GeneratePackageControl } from "./generate-package-control";
 import { LoadError } from "./load-error";
 import { PackageSections } from "./package-sections";
+import { DiscardDraftControl } from "./discard-draft-control";
+import { PackageToolbar } from "./package-toolbar";
+import { RestoreVersionForm } from "./restore-version-form";
 import { ScheduleDraftForm } from "./schedule-draft-form";
+import { SOURCE_LABELS, VersionHistory, versionTime } from "./version-history";
 
 function HeaderCard({ item }: { item: StudioItem }) {
   const meta = [item.platform ? PLATFORM_LABELS[item.platform] : null, item.format].filter(Boolean).join(" · ");
@@ -112,21 +125,60 @@ function NextAction({ item, tz }: { item: StudioItem; tz: string | null }) {
   );
 }
 
-function PackageArea({ item }: { item: StudioItem }) {
-  const latest = item.latest;
-  const pkg = latest?.package ?? null;
-  const unreadable = latest !== null && pkg === null;
+/** "Version 4 · You · Oct 15, 9:12 AM" plus its note. */
+function VersionLine({ version, tz }: { version: StudioVersion; tz: string | null }) {
+  const time = versionTime({
+    date: tz ? localDateKey(version.created_at, tz) : null,
+    time: tz ? localTimeKey(version.created_at, tz) : null,
+  });
+  return (
+    <p className="text-sm">
+      <span className="font-semibold">
+        Version {version.version_no} · {SOURCE_LABELS[version.source]}
+      </span>
+      {time ? <span className="text-muted-foreground"> · {time}</span> : null}
+      {version.note ? <span className="text-muted-foreground"> · {version.note}</span> : null}
+    </p>
+  );
+}
+
+function PackageArea({ item, versions, tz }: { item: StudioItem; versions: VersionSummary[] | null; tz: string | null }) {
+  const version = item.version;
+  const pkg = version?.package ?? null;
+  const unreadable = version !== null && pkg === null;
   const editable = (EDITABLE_STATUSES as readonly string[]).includes(item.status);
+  const rules = formatRulesFor(item.platform, item.format);
+  const edit =
+    editable && pkg && version
+      ? {
+          itemId: item.id,
+          baseVersion: version.version_no,
+          platforms: item.platforms,
+          regenerable: regenerableSections(pkg, rules),
+        }
+      : null;
 
   // The generate control keeps one tree position whether or not a package
   // exists, so its success toast survives the re-render.
   return (
     <div className="stack-lg">
-      {pkg ? (
-        <div>
+      {pkg && version ? (
+        <div className="stack-md">
           {/* Outline: the section h3s sit under this, not under "Schedule it". */}
           <h2 className="sr-only">Package</h2>
-          <PackageSections pkg={pkg} />
+          <div className="stack-sm">
+            <VersionLine version={version} tz={tz} />
+            <PackageToolbar text={packageToText(pkg, item.title)} fileName={downloadFileName(item.title)} />
+            {versions ? (
+              <VersionHistory
+                itemId={item.id}
+                versions={versions}
+                latestVersionNo={item.latestVersionNo}
+                viewingVersionNo={version.version_no}
+              />
+            ) : null}
+          </div>
+          <PackageSections pkg={pkg} edit={edit} />
         </div>
       ) : unreadable ? (
         <div role="alert" className="alert">
@@ -134,30 +186,97 @@ function PackageArea({ item }: { item: StudioItem }) {
         </div>
       ) : null}
       {editable ? (
-        <div className={latest ? "stack-sm" : "card stack-sm"}>
-          {latest ? null : (
+        <div className={version ? "stack-sm" : "card stack-sm"}>
+          {version ? null : (
             <>
               <h2 className="text-heading">No package yet</h2>
               <p className="text-muted-foreground">Turn this idea into a script, shot list and caption in your voice.</p>
             </>
           )}
-          <GeneratePackageControl itemId={item.id} hasPackage={latest !== null} />
+          <GeneratePackageControl itemId={item.id} hasPackage={version !== null} />
         </div>
       ) : (
         <p className="text-muted-foreground">
           This item is published or archived, so a package can&apos;t be generated for it.
         </p>
       )}
+      {item.status === "draft" ? <DiscardDraftControl itemId={item.id} /> : null}
     </div>
   );
 }
 
+/** A past version, read-only, with Restore and Back to latest. */
+function PreviewArea({ item, versions, tz }: { item: StudioItem; versions: VersionSummary[] | null; tz: string | null }) {
+  const version = item.version!;
+  const pkg = version.package;
+  const editable = (EDITABLE_STATUSES as readonly string[]).includes(item.status);
+  const time = versionTime({
+    date: tz ? localDateKey(version.created_at, tz) : null,
+    time: tz ? localTimeKey(version.created_at, tz) : null,
+  });
+  return (
+    <div className="stack-lg">
+      <section className="stack-sm rounded-md border-2 border-foreground p-4" aria-labelledby="studio-preview">
+        <h2 id="studio-preview" className="text-base font-bold">
+          Viewing version {version.version_no} ({SOURCE_LABELS[version.source]}
+          {time ? `, ${time}` : ""})
+        </h2>
+        <p className="text-sm">This is a read-only copy. Your latest version is unchanged.</p>
+        <div className="flex flex-col gap-2 min-[480px]:flex-row min-[480px]:items-start">
+          {pkg && editable && item.latestVersionNo ? (
+            <RestoreVersionForm itemId={item.id} versionNo={version.version_no} baseVersion={item.latestVersionNo} />
+          ) : null}
+          <div>
+            <Link href={`/app/studio/${item.id}`} className="btn btn-secondary btn-sm w-full min-[480px]:w-auto">
+              Back to latest
+            </Link>
+          </div>
+        </div>
+      </section>
+      {pkg ? (
+        <div className="stack-md">
+          <h2 className="sr-only">Package, version {version.version_no}</h2>
+          <div className="stack-sm">
+            <PackageToolbar text={packageToText(pkg, item.title)} fileName={downloadFileName(item.title)} />
+            {versions ? (
+              <VersionHistory
+                itemId={item.id}
+                versions={versions}
+                latestVersionNo={item.latestVersionNo}
+                viewingVersionNo={version.version_no}
+              />
+            ) : null}
+          </div>
+          <PackageSections pkg={pkg} edit={null} />
+        </div>
+      ) : (
+        <div role="alert" className="alert">
+          <p className="font-semibold">This version couldn&apos;t be shown, so it can&apos;t be restored.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** `?version=`: a positive whole number, or null (anything else shows the latest). */
+function parseVersionParam(raw: string | string[] | undefined): number | null {
+  if (typeof raw !== "string" || !/^[1-9]\d{0,5}$/.test(raw)) return null;
+  return Number(raw);
+}
+
 /** Session-bound part of /app/studio/[id]. Another creator's or an unknown id is a 404. */
-export async function StudioItemContent({ params }: { params: Promise<{ id: string }> }) {
+export async function StudioItemContent({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   // Past and upcoming dates depend on the current time: never prerender.
   await connection();
   const { userId } = await auth.protect();
-  const { id } = await params;
+  const [{ id }, query] = await Promise.all([params, searchParams]);
+  const requested = parseVersionParam(query.version);
 
   let client;
   try {
@@ -169,18 +288,41 @@ export async function StudioItemContent({ params }: { params: Promise<{ id: stri
 
   const timezone = await getTimezone(client, userId);
   const tz = timezone.ok ? timezone.timezone : null;
-  const result = await getStudioItem(client, userId, id, tz);
+  const [result, history] = await Promise.all([
+    getStudioItem(client, userId, id, tz, { versionNo: requested }),
+    listVersions(client, userId, id, tz),
+  ]);
   if (!result.ok) {
     if (result.code === "not_found") notFound();
     return <LoadError />;
   }
   const { item } = result;
+  // History is a convenience: if it fails to load, the page still works without it.
+  const versions = history.ok ? history.versions : null;
+  const previewing = item.version !== null && item.version.version_no !== item.latestVersionNo;
 
   return (
     <div className="stack-lg">
       <HeaderCard item={item} />
-      <NextAction item={item} tz={tz} />
-      <PackageArea item={item} />
+      {item.missingVersion ? (
+        <section className="card stack-sm" aria-labelledby="studio-missing-version">
+          <h2 id="studio-missing-version" className="text-heading">
+            We couldn&apos;t find that version
+          </h2>
+          <div>
+            <Link href={`/app/studio/${item.id}`} className="btn btn-secondary w-full min-[480px]:w-auto">
+              Go to the latest version
+            </Link>
+          </div>
+        </section>
+      ) : previewing ? (
+        <PreviewArea item={item} versions={versions} tz={tz} />
+      ) : (
+        <>
+          <NextAction item={item} tz={tz} />
+          <PackageArea item={item} versions={versions} tz={tz} />
+        </>
+      )}
     </div>
   );
 }

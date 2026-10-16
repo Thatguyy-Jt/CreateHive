@@ -218,8 +218,81 @@ describe("schedule_content_item", () => {
   });
 });
 
+describe("discard_studio_item", () => {
+  const discard = (tx: Transaction, itemId: string) => tx.query("select public.discard_studio_item($1::uuid)", [itemId]);
+
+  it("deletes a draft and its versions and returns its idea to saved", async () => {
+    await asUser(db, A, async (tx) => {
+      const ideaId = await idea(tx);
+      const itemId = await start(tx, ideaId);
+      await insertRow(tx, "content_versions", { user_id: A, content_item_id: itemId, version_no: 1, source: "ai" });
+      await insertRow(tx, "content_versions", { user_id: A, content_item_id: itemId, version_no: 2, source: "user" });
+      await discard(tx, itemId);
+      const { rows: items } = await tx.query("select id from public.content_items where id = $1", [itemId]);
+      expect(items).toEqual([]);
+      const { rows: versions } = await tx.query<{ n: number }>(
+        "select count(*)::int as n from public.content_versions where content_item_id = $1",
+        [itemId],
+      );
+      expect(versions[0].n).toBe(0);
+      expect(await ideaStatus(tx, ideaId)).toBe("saved");
+      // The idea can start a fresh draft.
+      expect(await start(tx, ideaId)).not.toBe(itemId);
+    });
+  });
+
+  it("returns a planned idea to saved (a packaged draft taken off the calendar)", async () => {
+    await asUser(db, A, async (tx) => {
+      const ideaId = await idea(tx);
+      const itemId = await start(tx, ideaId);
+      await insertRow(tx, "content_versions", { user_id: A, content_item_id: itemId, version_no: 1, source: "ai" });
+      await scheduleItem(tx, itemId, inHours(24));
+      await tx.query("select public.unschedule_content_item($1::uuid)", [itemId]);
+      expect(await ideaStatus(tx, ideaId)).toBe("planned");
+      await discard(tx, itemId);
+      expect(await ideaStatus(tx, ideaId)).toBe("saved");
+    });
+  });
+
+  it("refuses a scheduled item and leaves it alone", async () => {
+    await asUser(db, A, async (tx) => {
+      const ideaId = await idea(tx);
+      const itemId = await start(tx, ideaId);
+      await scheduleItem(tx, itemId, inHours(24));
+      await expectRaise(tx, () => discard(tx, itemId), /item_not_draft/);
+      const { rows } = await tx.query<{ status: string }>("select status from public.content_items where id = $1", [itemId]);
+      expect(rows[0].status).toBe("scheduled");
+      expect(await ideaStatus(tx, ideaId)).toBe("planned");
+    });
+  });
+
+  it("treats another creator's item as not found and leaves it and its versions alone", async () => {
+    await asUser(db, A, async (tx) => {
+      await expectRaise(tx, () => discard(tx, bobDraft), /item_not_found/);
+    });
+    const { rows } = await asService(db, (tx) =>
+      tx.query<{ n: number }>("select count(*)::int as n from public.content_versions where content_item_id = $1", [bobDraft]),
+    );
+    expect(rows[0].n).toBe(1);
+  });
+
+  it("raises without an authenticated subject and can't be executed by anon", async () => {
+    await expect(asSubjectless(db, (tx) => discard(tx, bobDraft))).rejects.toThrow(/authenticated creator/);
+    await expect(asAnon(db, (tx) => discard(tx, bobDraft))).rejects.toThrow(/permission denied/);
+  });
+
+  it("leaves versions append-only for creators", async () => {
+    await asUser(db, A, async (tx) => {
+      const itemId = await start(tx, await idea(tx));
+      await insertRow(tx, "content_versions", { user_id: A, content_item_id: itemId, version_no: 1, source: "ai" });
+      await expectRaise(tx, () => tx.query("delete from public.content_versions"), /permission denied/);
+      await expectRaise(tx, () => tx.query("update public.content_versions set version_no = 9"), /permission denied/);
+    });
+  });
+});
+
 describe("studio functions", () => {
-  it.each(["start_studio_item", "schedule_content_item"])("%s is SECURITY INVOKER with a pinned search_path", async (name) => {
+  it.each(["start_studio_item", "schedule_content_item", "discard_studio_item"])("%s is SECURITY INVOKER with a pinned search_path", async (name) => {
     const { rows } = await db.query<{ prosecdef: boolean; proconfig: string[] }>(
       "select prosecdef, proconfig from pg_proc where proname = $1",
       [name],

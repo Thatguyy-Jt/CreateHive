@@ -927,6 +927,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      discard_studio_item: {
+        Args: { p_item_id: string }
+        Returns: undefined
+      }
       save_creator_strategy: {
         Args: { p_pillars: Json; p_strategy: Json }
         Returns: number

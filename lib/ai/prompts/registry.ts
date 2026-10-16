@@ -1,5 +1,6 @@
 import { contentOpportunitiesV2 } from "./content_opportunities/v2";
 import { contentPackageV1 } from "./content_package/v1";
+import { contentSectionV1 } from "./content_section/v1";
 import { creatorStrategyV1 } from "./creator_strategy/v1";
 import { smokeTestV1 } from "./smoke_test/v1";
 import { weeklyPlanV1 } from "./weekly_plan/v1";
@@ -14,6 +15,7 @@ export const ACTIVE_PROMPTS = {
   content_opportunities: contentOpportunitiesV2,
   weekly_plan: weeklyPlanV1,
   content_package: contentPackageV1,
+  content_section: contentSectionV1,
 } as const;
 
 export type AiKind = keyof typeof ACTIVE_PROMPTS;

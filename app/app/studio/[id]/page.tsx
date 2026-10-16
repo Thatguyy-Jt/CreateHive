@@ -23,7 +23,7 @@ function ItemSkeleton() {
 
 // The heading is static; `params` and the session are read behind Suspense,
 // where the content calls `auth.protect()` itself.
-export default function StudioItemPage({ params }: PageProps<"/app/studio/[id]">) {
+export default function StudioItemPage({ params, searchParams }: PageProps<"/app/studio/[id]">) {
   return (
     <div className="stack-lg max-w-3xl">
       <div className="stack-sm">
@@ -35,7 +35,7 @@ export default function StudioItemPage({ params }: PageProps<"/app/studio/[id]">
         <h1>Content package</h1>
       </div>
       <Suspense fallback={<ItemSkeleton />}>
-        <StudioItemContent params={params} />
+        <StudioItemContent params={params} searchParams={searchParams} />
       </Suspense>
     </div>
   );

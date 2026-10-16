@@ -22,6 +22,10 @@ describe("model routing", () => {
     });
   });
 
+  it("routes section regeneration to the quality tier with a 4k output ceiling", () => {
+    expect(routeTask("content_section")).toMatchObject({ tier: "quality", maxOutputTokens: 4_000 });
+  });
+
   it("has a route for every prompt kind and a prompt for every route", () => {
     expect(Object.keys(AI_TASK_ROUTES).sort()).toEqual(Object.keys(ACTIVE_PROMPTS).sort());
   });

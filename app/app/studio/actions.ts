@@ -8,7 +8,15 @@ import { runStructured } from "@/lib/ai";
 import { logEvent } from "@/lib/observability/log";
 import { STUDIO_ERRORS } from "@/lib/schemas/studio";
 import { CALENDAR_ERRORS, getTimezone } from "@/lib/services/calendar";
-import { generateContentPackage, scheduleStudioItem, startStudioItem } from "@/lib/services/studio";
+import {
+  discardStudioItem,
+  generateContentPackage,
+  regenerateSection,
+  restoreVersion,
+  savePackageSection,
+  scheduleStudioItem,
+  startStudioItem,
+} from "@/lib/services/studio";
 import { createUserClient } from "@/lib/supabase/server";
 
 function userClient(event: string) {
@@ -130,4 +138,114 @@ export async function scheduleStudioItemAction(
   revalidatePath("/app/studio");
   revalidatePath(`/app/studio/${itemId.data}`);
   return { status: "ok", message: null, submission, date };
+}
+
+export type SaveSectionResult = { ok: true; versionNo: number } | { ok: false; message: string };
+
+/**
+ * Saves the creator's edit of one section as a new version. Untrusted input:
+ * the service validates the section value and merges it server-side.
+ */
+export async function savePackageSectionAction(itemId: unknown, input: unknown): Promise<SaveSectionResult> {
+  const { userId } = await auth.protect();
+
+  const id = idInput.safeParse(itemId);
+  if (!id.success) return { ok: false, message: STUDIO_ERRORS.not_found.message };
+
+  const client = userClient("studio_save_failed");
+  if (!client) return { ok: false, message: STUDIO_ERRORS.persistence_error.message };
+
+  const result = await savePackageSection(client, userId, id.data, input);
+  if (!result.ok) return { ok: false, message: result.message };
+
+  revalidatePath(`/app/studio/${id.data}`);
+  return { ok: true, versionNo: result.versionNo };
+}
+
+const positiveInt = z.coerce.number().int().positive();
+
+export interface VersionActionState {
+  status: "idle" | "error";
+  message: string | null;
+}
+
+/** Restores a past version as the new latest one, then shows the latest. */
+export async function restoreVersionAction(_previous: VersionActionState, formData: FormData): Promise<VersionActionState> {
+  const { userId } = await auth.protect();
+
+  const itemId = idInput.safeParse(field(formData, "item_id"));
+  if (!itemId.success) return { status: "error", message: STUDIO_ERRORS.not_found.message };
+  const versionNo = positiveInt.safeParse(field(formData, "version_no"));
+  const baseVersion = positiveInt.safeParse(field(formData, "base_version"));
+  if (!versionNo.success || !baseVersion.success) {
+    return { status: "error", message: STUDIO_ERRORS.invalid_input.message };
+  }
+
+  const client = userClient("studio_restore_failed");
+  if (!client) return { status: "error", message: STUDIO_ERRORS.persistence_error.message };
+
+  const result = await restoreVersion(client, userId, itemId.data, {
+    versionNo: versionNo.data,
+    baseVersion: baseVersion.data,
+  });
+  if (!result.ok) return { status: "error", message: result.message };
+
+  revalidatePath(`/app/studio/${itemId.data}`);
+  // Outside any try: `redirect` works by throwing.
+  redirect(`/app/studio/${itemId.data}`);
+}
+
+/** Regenerates one section of the latest package. Success re-renders the page. */
+export async function regenerateSectionAction(
+  previous: GeneratePackageState,
+  formData: FormData,
+): Promise<GeneratePackageState> {
+  const { userId } = await auth.protect();
+  const submission = previous.submission + 1;
+  const error = (message: string, retryable: boolean): GeneratePackageState => ({
+    status: "error",
+    message,
+    retryable,
+    submission,
+  });
+
+  const itemId = idInput.safeParse(field(formData, "item_id"));
+  if (!itemId.success) return error(STUDIO_ERRORS.not_found.message, false);
+  const baseVersion = positiveInt.safeParse(field(formData, "base_version"));
+  if (!baseVersion.success) return error(STUDIO_ERRORS.invalid_input.message, false);
+
+  const client = userClient("content_section_failed");
+  if (!client) return error(STUDIO_ERRORS.persistence_error.message, true);
+
+  const result = await regenerateSection(
+    client,
+    userId,
+    itemId.data,
+    { section: field(formData, "section"), baseVersion: baseVersion.data, instruction: field(formData, "instruction") },
+    { run: runStructured },
+  );
+  if (!result.ok) return error(result.message, result.retryable);
+
+  revalidatePath(`/app/studio/${itemId.data}`);
+  return { status: "ok", message: null, retryable: false, submission, versionNo: result.versionNo };
+}
+
+/** Deletes a Studio draft and its versions, returns its idea to Saved, then goes to the Studio list. */
+export async function discardStudioItemAction(_previous: VersionActionState, formData: FormData): Promise<VersionActionState> {
+  const { userId } = await auth.protect();
+
+  const itemId = idInput.safeParse(field(formData, "item_id"));
+  if (!itemId.success) return { status: "error", message: STUDIO_ERRORS.not_found.message };
+
+  const client = userClient("studio_discard_failed");
+  if (!client) return { status: "error", message: STUDIO_ERRORS.db_error.message };
+
+  const result = await discardStudioItem(client, userId, itemId.data);
+  if (!result.ok) return { status: "error", message: result.message };
+
+  revalidatePath("/app");
+  revalidatePath("/app/opportunities");
+  revalidatePath("/app/calendar");
+  revalidatePath("/app/studio", "layout");
+  redirect("/app/studio");
 }

@@ -4,17 +4,34 @@ import type { AiResult, RunStructuredRequest } from "@/lib/ai/run-structured";
 import { localDateKey, localTimeKey } from "@/lib/calendar/dates";
 import { logEvent } from "@/lib/observability/log";
 import { platform as platformSchema, type Platform } from "@/lib/schemas/creator";
-import { contentItemStatus, type ContentItemStatus } from "@/lib/schemas/enums";
+import { authorSource, contentItemStatus, type AuthorSource, type ContentItemStatus } from "@/lib/schemas/enums";
 import { EVIDENCE_KIND_LABELS, ideaEvidence, type IdeaEvidence } from "@/lib/schemas/opportunities";
 import { parseWith } from "@/lib/schemas/parse";
 import {
   contentPackageModelSchemaFor,
   contentPackageOutputFor,
+  describeIssue,
+  editedNote,
   formatRulesFor,
+  GENERATED_NOTE,
   parseStoredPackage,
+  REGENERATED_NOTE_PREFIX,
+  regeneratedNote,
+  restoredNote,
+  SECTION_KEYS,
+  SECTION_LABELS,
+  sectionInputFor,
+  sectionKey,
+  sectionModelSchemaFor,
+  sectionOutputFor,
+  sectionTexts,
   STUDIO_ERRORS,
   STUDIO_PACKAGE_SCHEMA_VERSION,
+  userPackageFor,
   type ContentPackageModelOutput,
+  type SectionKey,
+  type SectionModelOutput,
+  type SectionValue,
   type StudioErrorCode,
   type StudioPackage,
 } from "@/lib/schemas/studio";
@@ -25,15 +42,26 @@ import { buildCreatorContext, renderContextForPrompt, type CreatorContext } from
 type StudioClient = Pick<SupabaseClient<Database>, "from" | "rpc">;
 type ReadClient = Pick<SupabaseClient<Database>, "from">;
 
-/** A package generation still pending inside this window blocks another one. */
+/** A package or section generation still pending inside this window blocks another one. */
 export const IN_FLIGHT_WINDOW_MS = 2 * 60 * 1000;
-/** AI versions allowed per item inside `ITEM_LIMIT_WINDOW_MS`. */
+/** Whole-package generations allowed per item inside `ITEM_LIMIT_WINDOW_MS`. */
 export const ITEM_VERSION_LIMIT = 5;
+/** Section regenerations allowed per item inside `ITEM_LIMIT_WINDOW_MS`. */
+export const SECTION_REGENERATION_LIMIT = 10;
 export const ITEM_LIMIT_WINDOW_MS = 24 * 60 * 60 * 1000;
+/** Most versions one item may have; version numbers are sequential, so the latest number is the count. */
+export const MAX_VERSIONS_PER_ITEM = 100;
+/** Versions listed in History. */
+export const HISTORY_LIMIT = 20;
+/** Longest "what should change?" note sent with a section regeneration. */
+export const INSTRUCTION_MAX_LENGTH = 200;
 /** Ceiling on the rendered creator context sent with a package request. */
 export const CONTEXT_CHAR_LIMIT = 5_000;
 /** Items shown on /app/studio. */
 export const STUDIO_LIST_LIMIT = 50;
+
+/** The AI kinds the in-flight guard covers: one Studio generation at a time per creator. */
+const STUDIO_AI_KINDS = ["content_package", "content_section"];
 
 /** Statuses Studio lists and can generate for. `published` and `archived` are read-only. */
 export const EDITABLE_STATUSES = ["draft", "ready", "scheduled"] as const satisfies readonly ContentItemStatus[];
@@ -43,6 +71,12 @@ export type StudioFailure = { ok: false; code: StudioErrorCode; message: string;
 
 function fail(code: StudioErrorCode): StudioFailure {
   return { ok: false, code, ...STUDIO_ERRORS[code] };
+}
+
+/** `invalid_input` with a message naming the field that doesn't fit. */
+function invalid(issues: readonly z.core.$ZodIssue[]): StudioFailure {
+  const first = issues[0];
+  return { ok: false, code: "invalid_input", message: first ? describeIssue(first) : STUDIO_ERRORS.invalid_input.message, retryable: false };
 }
 
 function unexpected(event: string, error: unknown) {
@@ -55,6 +89,8 @@ const asPlatform = (value: string | null): Platform | null => {
   const parsed = platformSchema.safeParse(value);
   return parsed.success ? parsed.data : null;
 };
+
+const storedContent = (pkg: StudioPackage) => ({ schema_version: STUDIO_PACKAGE_SCHEMA_VERSION, package: pkg }) as unknown as Json;
 
 // ---------------------------------------------------------------------------
 // Reading one item
@@ -131,8 +167,143 @@ async function readItem(client: ReadClient, userId: string, itemId: string, even
   };
 }
 
+/** An item the creator may change: theirs, and draft, ready or scheduled. */
+async function readEditableItem(
+  client: ReadClient,
+  userId: string,
+  itemId: string,
+  event: string,
+): Promise<{ ok: true; item: LoadedItem } | StudioFailure> {
+  const loaded = await readItem(client, userId, itemId, event);
+  if (!loaded.ok) return fail(loaded.code === "not_found" ? "not_found" : "persistence_error");
+  if (!EDITABLE.has(loaded.item.status)) return fail("not_editable");
+  return loaded;
+}
+
+type LatestResult =
+  | { ok: true; latest: { version_no: number; package: StudioPackage | null } | null }
+  | StudioFailure;
+
+/** The item's highest version, with its package (null when unreadable). */
+async function readLatestVersion(client: ReadClient, userId: string, itemId: string, event: string): Promise<LatestResult> {
+  const row = await client
+    .from("content_versions")
+    .select("version_no, content")
+    .eq("user_id", userId)
+    .eq("content_item_id", itemId)
+    .order("version_no", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (row.error) {
+    logEvent("error", event, { stage: "latest_version", db_code: row.error.code });
+    return fail("persistence_error");
+  }
+  if (!row.data) return { ok: true, latest: null };
+  const stored = parseStoredPackage(row.data.content);
+  return { ok: true, latest: { version_no: row.data.version_no, package: stored.ok ? stored.package : null } };
+}
+
+/** The creator's selected platforms (repurposing may only target these). */
+async function readPlatforms(
+  client: ReadClient,
+  userId: string,
+  event: string,
+): Promise<{ ok: true; platforms: Platform[] } | StudioFailure> {
+  const row = await client.from("creator_profiles").select("platforms").eq("user_id", userId).maybeSingle();
+  if (row.error) {
+    logEvent("error", event, { stage: "platforms", db_code: row.error.code });
+    return fail("persistence_error");
+  }
+  const platforms = (row.data?.platforms ?? []).map(asPlatform).filter((p): p is Platform => p !== null);
+  return { ok: true, platforms };
+}
+
+/** Appends one version. Another write with the same number got there first: `version_conflict`. */
+async function insertVersion(
+  client: ReadClient,
+  event: string,
+  row: Database["public"]["Tables"]["content_versions"]["Insert"],
+): Promise<{ ok: true } | StudioFailure> {
+  const inserted = await client.from("content_versions").insert(row);
+  if (!inserted.error) return { ok: true };
+  logEvent("error", event, { stage: "insert", db_code: inserted.error.code });
+  return fail(inserted.error.code === "23505" ? "version_conflict" : "persistence_error");
+}
+
+const generationFailed = (stage: string, fields: { db_code?: string; code?: string } = {}) =>
+  logEvent("error", "content_package_failed", { stage, ...fields });
+
+/** Context, platforms and idea input shared by both AI tasks. */
+async function buildGenerationInput(
+  client: ReadClient,
+  userId: string,
+  item: LoadedItem,
+): Promise<
+  | {
+      ok: true;
+      context: string;
+      platforms: Platform[];
+      idea: {
+        topic: string;
+        audience_need: string | null;
+        angle: string | null;
+        hook: string | null;
+        rationale: string | null;
+        cta: string | null;
+        pillar: string | null;
+        evidence: string[];
+      };
+    }
+  | StudioFailure
+> {
+  const built = await buildCreatorContext(client, userId, {
+    include: ["profile", "brand", "pillars", "strategy", "recentContent", "performance", "insights"],
+  });
+  if (!built.ok) return fail("persistence_error");
+  const { context } = built;
+  if (!context.profile || !context.strategy) return fail("missing_context");
+  const platforms = context.profile.platforms.map(asPlatform).filter((p): p is Platform => p !== null);
+  if (platforms.length === 0) return fail("missing_context");
+
+  const idea = item.idea;
+  return {
+    ok: true,
+    context: renderCappedContext(context),
+    platforms,
+    idea: {
+      topic: idea?.topic ?? item.title,
+      audience_need: idea?.audience_need ?? null,
+      angle: idea?.angle ?? null,
+      hook: idea?.hook ?? null,
+      rationale: idea?.rationale ?? null,
+      cta: idea?.cta ?? null,
+      pillar: item.pillar_name,
+      // Summaries and source names only: no URLs reach the model.
+      evidence: (idea?.evidence ?? []).map(
+        (entry) => `${EVIDENCE_KIND_LABELS[entry.kind]}: ${entry.summary}${entry.source ? ` (${entry.source})` : ""}`,
+      ),
+    },
+  };
+}
+
+/** One pending Studio generation (package or section) per creator at a time. */
+async function checkInFlight(client: ReadClient, userId: string, now: number): Promise<{ ok: true } | StudioFailure> {
+  const pending = await client
+    .from("ai_generations")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .in("kind", STUDIO_AI_KINDS)
+    .eq("status", "pending")
+    .gte("created_at", new Date(now - IN_FLIGHT_WINDOW_MS).toISOString());
+  if (pending.error) {
+    generationFailed("in_flight_check", { db_code: pending.error.code });
+    return fail("persistence_error");
+  }
+  return (pending.count ?? 0) > 0 ? fail("in_progress") : { ok: true };
+}
+
 // ---------------------------------------------------------------------------
-// Generation
+// Whole-package generation
 // ---------------------------------------------------------------------------
 
 export type GeneratePackageResult = { ok: true; versionNo: number } | StudioFailure;
@@ -172,9 +343,6 @@ export function renderCappedContext(context: CreatorContext, limit: number = CON
   return rendered;
 }
 
-const generationFailed = (stage: string, fields: { db_code?: string; code?: string } = {}) =>
-  logEvent("error", "content_package_failed", { stage, ...fields });
-
 /**
  * Content Agent: turns one of the creator's Studio items (and its idea) into
  * a full package through the AI service, and stores it as the item's next AI
@@ -195,22 +363,16 @@ export async function generateContentPackage(
 
   try {
     // 1. The item, its idea and pillar.
-    const loaded = await readItem(client, userId, id.data, "content_package_failed");
-    if (!loaded.ok) return fail(loaded.code === "not_found" ? "not_found" : "persistence_error");
+    const loaded = await readEditableItem(client, userId, id.data, "content_package_failed");
+    if (!loaded.ok) return loaded;
     const { item } = loaded;
-    if (!EDITABLE.has(item.status)) return fail("not_editable");
 
     // 2. Creator context.
-    const built = await buildCreatorContext(client, userId, {
-      include: ["profile", "brand", "pillars", "strategy", "recentContent", "performance", "insights"],
-    });
-    if (!built.ok) return fail("persistence_error");
-    const { context } = built;
-    if (!context.profile || !context.strategy) return fail("missing_context");
-    const platforms = context.profile.platforms.map(asPlatform).filter((p): p is Platform => p !== null);
-    if (platforms.length === 0) return fail("missing_context");
+    const input = await buildGenerationInput(client, userId, item);
+    if (!input.ok) return input;
+    const { platforms } = input;
 
-    // 3. Per-item cap: no AI call after 5 packages for this item in 24 hours.
+    // 3. Per-item cap: no AI call after 5 whole packages for this item in 24 hours.
     const since = new Date(now() - ITEM_LIMIT_WINDOW_MS).toISOString();
     const recent = await client
       .from("content_versions")
@@ -218,6 +380,7 @@ export async function generateContentPackage(
       .eq("user_id", userId)
       .eq("content_item_id", item.id)
       .eq("source", "ai")
+      .eq("note", GENERATED_NOTE)
       .gte("created_at", since);
     if (recent.error) {
       generationFailed("item_limit_check", { db_code: recent.error.code });
@@ -225,42 +388,19 @@ export async function generateContentPackage(
     }
     if ((recent.count ?? 0) >= ITEM_VERSION_LIMIT) return fail("item_limit");
 
-    // 4. In-flight guard: one pending package generation per creator.
-    const pending = await client
-      .from("ai_generations")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .eq("kind", "content_package")
-      .eq("status", "pending")
-      .gte("created_at", new Date(now() - IN_FLIGHT_WINDOW_MS).toISOString());
-    if (pending.error) {
-      generationFailed("in_flight_check", { db_code: pending.error.code });
-      return fail("persistence_error");
-    }
-    if ((pending.count ?? 0) > 0) return fail("in_progress");
+    // 4. In-flight guard.
+    const guard = await checkInFlight(client, userId, now());
+    if (!guard.ok) return guard;
 
     // 5. Generate.
     const rules = formatRulesFor(item.platform, item.format);
     const schema = contentPackageOutputFor({ platforms, primaryPlatform: item.platform, format: item.format });
-    const idea = item.idea;
     const result = await deps.run({
       userId,
       kind: "content_package",
       input: {
-        context: renderCappedContext(context),
-        idea: {
-          topic: idea?.topic ?? item.title,
-          audience_need: idea?.audience_need ?? null,
-          angle: idea?.angle ?? null,
-          hook: idea?.hook ?? null,
-          rationale: idea?.rationale ?? null,
-          cta: idea?.cta ?? null,
-          pillar: item.pillar_name,
-          // Summaries and source names only: no URLs reach the model.
-          evidence: (idea?.evidence ?? []).map(
-            (entry) => `${EVIDENCE_KIND_LABELS[entry.kind]}: ${entry.summary}${entry.source ? ` (${entry.source})` : ""}`,
-          ),
-        },
+        context: input.context,
+        idea: input.idea,
         platform: item.platform,
         format: item.format,
         video: rules.video,
@@ -289,19 +429,17 @@ export async function generateContentPackage(
       return fail("persistence_error");
     }
     const versionNo = (latest.data?.version_no ?? 0) + 1;
-    const inserted = await client.from("content_versions").insert({
+    if (versionNo > MAX_VERSIONS_PER_ITEM) return fail("version_limit");
+    const inserted = await insertVersion(client, "content_package_failed", {
       user_id: userId,
       content_item_id: item.id,
       version_no: versionNo,
-      content: { schema_version: STUDIO_PACKAGE_SCHEMA_VERSION, package: result.data } as unknown as Json,
+      content: storedContent(result.data),
       source: "ai",
-      note: "Generated package",
+      note: GENERATED_NOTE,
       ai_generation_id: result.generationId,
     });
-    if (inserted.error) {
-      generationFailed("insert", { db_code: inserted.error.code });
-      return fail(inserted.error.code === "23505" ? "in_progress" : "persistence_error");
-    }
+    if (!inserted.ok) return inserted.code === "version_conflict" ? fail("in_progress") : inserted;
     return { ok: true, versionNo };
   } catch (error) {
     unexpected("content_package_failed", error);
@@ -310,7 +448,274 @@ export async function generateContentPackage(
 }
 
 // ---------------------------------------------------------------------------
-// Starting and scheduling
+// Editing and restoring (no AI)
+// ---------------------------------------------------------------------------
+
+export type SaveVersionResult = { ok: true; versionNo: number } | StudioFailure;
+
+const saveInput = z.object({
+  baseVersion: z.number().int().positive(),
+  section: sectionKey,
+  value: z.unknown(),
+});
+
+/**
+ * Saves the creator's edit of one section as a new version (`source: 'user'`).
+ * The server merges the section into the latest package, so the browser never
+ * sends a whole package; a stale `baseVersion` is a conflict. Never throws.
+ */
+export async function savePackageSection(
+  client: ReadClient,
+  userId: string,
+  itemId: unknown,
+  input: unknown,
+): Promise<SaveVersionResult> {
+  const id = uuid.safeParse(itemId);
+  if (!id.success) return fail("not_found");
+  const parsed = saveInput.safeParse(input);
+  if (!parsed.success) return fail("invalid_input");
+  const { baseVersion, section } = parsed.data;
+  const value = sectionInputFor(section).safeParse(parsed.data.value);
+  if (!value.success) return invalid(value.error.issues);
+
+  try {
+    const loaded = await readEditableItem(client, userId, id.data, "studio_save_failed");
+    if (!loaded.ok) return loaded;
+
+    const [latestResult, platformResult] = await Promise.all([
+      readLatestVersion(client, userId, id.data, "studio_save_failed"),
+      readPlatforms(client, userId, "studio_save_failed"),
+    ]);
+    if (!latestResult.ok) return latestResult;
+    if (!platformResult.ok) return platformResult;
+    const { latest } = latestResult;
+    if (!latest) return fail("version_not_found");
+    if (latest.version_no !== baseVersion) return fail("version_conflict");
+    if (!latest.package) return fail("unreadable_version");
+    if (latest.version_no >= MAX_VERSIONS_PER_ITEM) return fail("version_limit");
+
+    const merged = userPackageFor({ platforms: platformResult.platforms }).safeParse({ ...latest.package, ...value.data });
+    if (!merged.success) return invalid(merged.error.issues);
+
+    const versionNo = baseVersion + 1;
+    const inserted = await insertVersion(client, "studio_save_failed", {
+      user_id: userId,
+      content_item_id: id.data,
+      version_no: versionNo,
+      content: storedContent(merged.data),
+      source: "user",
+      note: editedNote(section),
+    });
+    return inserted.ok ? { ok: true, versionNo } : inserted;
+  } catch (error) {
+    unexpected("studio_save_failed", error);
+    return fail("persistence_error");
+  }
+}
+
+const restoreInput = z.object({ versionNo: z.number().int().positive(), baseVersion: z.number().int().positive() });
+
+/**
+ * Restores a past version by copying its package into a new latest version.
+ * History is never rewritten. Never throws.
+ */
+export async function restoreVersion(
+  client: ReadClient,
+  userId: string,
+  itemId: unknown,
+  input: unknown,
+): Promise<SaveVersionResult> {
+  const id = uuid.safeParse(itemId);
+  if (!id.success) return fail("not_found");
+  const parsed = restoreInput.safeParse(input);
+  if (!parsed.success) return fail("invalid_input");
+  const { versionNo, baseVersion } = parsed.data;
+
+  try {
+    const loaded = await readEditableItem(client, userId, id.data, "studio_restore_failed");
+    if (!loaded.ok) return loaded;
+    const latestResult = await readLatestVersion(client, userId, id.data, "studio_restore_failed");
+    if (!latestResult.ok) return latestResult;
+    const { latest } = latestResult;
+    if (!latest) return fail("version_not_found");
+    if (latest.version_no !== baseVersion) return fail("version_conflict");
+    if (versionNo === latest.version_no) return fail("already_latest");
+    if (latest.version_no >= MAX_VERSIONS_PER_ITEM) return fail("version_limit");
+
+    const target = await client
+      .from("content_versions")
+      .select("content")
+      .eq("user_id", userId)
+      .eq("content_item_id", id.data)
+      .eq("version_no", versionNo)
+      .maybeSingle();
+    if (target.error) {
+      logEvent("error", "studio_restore_failed", { stage: "target", db_code: target.error.code });
+      return fail("persistence_error");
+    }
+    if (!target.data) return fail("version_not_found");
+    const stored = parseStoredPackage(target.data.content);
+    if (!stored.ok) return fail("unreadable_version");
+
+    const next = baseVersion + 1;
+    const inserted = await insertVersion(client, "studio_restore_failed", {
+      user_id: userId,
+      content_item_id: id.data,
+      version_no: next,
+      content: storedContent(stored.package),
+      source: "user",
+      note: restoredNote(versionNo),
+    });
+    return inserted.ok ? { ok: true, versionNo: next } : inserted;
+  } catch (error) {
+    unexpected("studio_restore_failed", error);
+    return fail("persistence_error");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Section regeneration
+// ---------------------------------------------------------------------------
+
+type RunSection = (
+  request: RunStructuredRequest<"content_section", SectionModelOutput, SectionValue>,
+) => Promise<AiResult<SectionValue>>;
+
+export interface SectionDeps {
+  /** `runStructured` from `@/lib/ai`; injected so tests never reach a provider. */
+  run: RunSection;
+  now?: () => number;
+}
+
+const regenerateInput = z.object({
+  section: sectionKey,
+  baseVersion: z.number().int().positive(),
+  instruction: z
+    .string()
+    .nullable()
+    .transform((value) => value?.trim() || null)
+    .pipe(z.string().max(INSTRUCTION_MAX_LENGTH).nullable()),
+});
+
+/**
+ * Sections that can be regenerated for this item: a shot list only for video
+ * formats or when there are shots, a thumbnail only when the format needs one
+ * or there is one already.
+ */
+export function regenerableSections(
+  pkg: StudioPackage,
+  rules: { video: boolean; thumbnailRequired: boolean },
+): SectionKey[] {
+  return SECTION_KEYS.filter((key) => {
+    if (key === "shot_list") return rules.video || pkg.shot_list.length > 0;
+    if (key === "thumbnail") return rules.thumbnailRequired || pkg.thumbnail !== null;
+    return true;
+  });
+}
+
+/**
+ * Regenerates one section of the latest package through the AI service and
+ * stores the merged package as a new AI version. Only that section changes.
+ * Never throws; nothing is stored on failure.
+ */
+export async function regenerateSection(
+  client: ReadClient,
+  userId: string,
+  itemId: unknown,
+  input: unknown,
+  deps: SectionDeps,
+): Promise<SaveVersionResult> {
+  const now = deps.now ?? Date.now;
+  const id = uuid.safeParse(itemId);
+  if (!id.success) return fail("not_found");
+  const parsed = regenerateInput.safeParse(input);
+  if (!parsed.success) return fail("invalid_input");
+  const { section, baseVersion, instruction } = parsed.data;
+
+  try {
+    // 1. The item and its latest package.
+    const loaded = await readEditableItem(client, userId, id.data, "content_section_failed");
+    if (!loaded.ok) return loaded;
+    const { item } = loaded;
+    const latestResult = await readLatestVersion(client, userId, id.data, "content_section_failed");
+    if (!latestResult.ok) return latestResult;
+    const { latest } = latestResult;
+    if (!latest) return fail("version_not_found");
+    if (latest.version_no !== baseVersion) return fail("version_conflict");
+    if (!latest.package) return fail("unreadable_version");
+    if (latest.version_no >= MAX_VERSIONS_PER_ITEM) return fail("version_limit");
+    const rules = formatRulesFor(item.platform, item.format);
+    if (!regenerableSections(latest.package, rules).includes(section)) return fail("invalid_input");
+
+    // 2. Creator context.
+    const generation = await buildGenerationInput(client, userId, item);
+    if (!generation.ok) return generation;
+    const { platforms } = generation;
+
+    // 3. Section cap: no AI call after 10 section regenerations for this item in 24 hours.
+    const recent = await client
+      .from("content_versions")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("content_item_id", item.id)
+      .eq("source", "ai")
+      .like("note", `${REGENERATED_NOTE_PREFIX}%`)
+      .gte("created_at", new Date(now() - ITEM_LIMIT_WINDOW_MS).toISOString());
+    if (recent.error) {
+      logEvent("error", "content_section_failed", { stage: "section_limit_check", db_code: recent.error.code });
+      return fail("persistence_error");
+    }
+    if ((recent.count ?? 0) >= SECTION_REGENERATION_LIMIT) return fail("section_limit");
+
+    // 4. In-flight guard.
+    const guard = await checkInFlight(client, userId, now());
+    if (!guard.ok) return guard;
+
+    // 5. Generate only this section, with the current package as context.
+    const texts = sectionTexts(latest.package);
+    const schema = sectionOutputFor(section, { platforms, video: rules.video });
+    const result = await deps.run({
+      userId,
+      kind: "content_section",
+      input: {
+        context: generation.context,
+        idea: generation.idea,
+        platform: item.platform,
+        format: item.format,
+        video: rules.video,
+        platforms,
+        section,
+        packageSections: SECTION_KEYS.map((key) => ({ section: key, label: SECTION_LABELS[key], text: texts[key] })),
+        instruction,
+      },
+      schema: sectionModelSchemaFor(section, platforms),
+      validate: (output) => parseWith(schema as z.ZodType<SectionValue>, output),
+    });
+    if (!result.ok) {
+      logEvent("error", "content_section_failed", { stage: "ai", code: result.code });
+      return fail(result.code);
+    }
+
+    // 6. Merge and store. A concurrent edit in the meantime is a conflict.
+    const versionNo = baseVersion + 1;
+    const inserted = await insertVersion(client, "content_section_failed", {
+      user_id: userId,
+      content_item_id: item.id,
+      version_no: versionNo,
+      content: storedContent({ ...latest.package, ...result.data }),
+      source: "ai",
+      note: regeneratedNote(section),
+      ai_generation_id: result.generationId,
+    });
+    return inserted.ok ? { ok: true, versionNo } : inserted;
+  } catch (error) {
+    unexpected("content_section_failed", error);
+    return fail("persistence_error");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Starting, scheduling and discarding
 // ---------------------------------------------------------------------------
 
 /**
@@ -382,6 +787,32 @@ export async function scheduleStudioItem(
   } catch (error) {
     unexpected("studio_schedule_failed", error);
     return calendarFail("db_error");
+  }
+}
+
+/**
+ * Deletes a Studio draft and all its versions, and returns its idea to Saved
+ * (`discard_studio_item`). Drafts only. Never throws.
+ */
+export async function discardStudioItem(
+  client: StudioClient,
+  userId: string,
+  itemId: unknown,
+): Promise<{ ok: true } | StudioFailure> {
+  const id = uuid.safeParse(itemId);
+  if (!id.success) return fail("not_found");
+  try {
+    const result = await client.rpc("discard_studio_item", { p_item_id: id.data });
+    if (result.error) {
+      if (result.error.message === "item_not_found") return fail("not_found");
+      if (result.error.message === "item_not_draft") return fail("not_draft");
+      logEvent("error", "studio_discard_failed", { stage: "rpc", db_code: result.error.code });
+      return fail("db_error");
+    }
+    return { ok: true };
+  } catch (error) {
+    unexpected("studio_discard_failed", error);
+    return fail("db_error");
   }
 }
 
@@ -481,61 +912,87 @@ export async function listStudioItems(
   }
 }
 
+export interface StudioVersion {
+  version_no: number;
+  source: AuthorSource;
+  note: string | null;
+  created_at: string;
+  /** The package; null when it can't be read. */
+  package: StudioPackage | null;
+}
+
 export interface StudioItem extends LoadedItem {
   /** Local date and time in the creator's zone, when scheduled and a zone is known. */
   date: string | null;
   time: string | null;
   passed: boolean;
-  /** The highest version; `package` is null when it can't be read. */
-  latest: { version_no: number; created_at: string; package: StudioPackage | null } | null;
+  /** The version in view: the requested one, else the latest. Null when there is none (or the requested one is missing). */
+  version: StudioVersion | null;
+  /** The highest version number, or null when the item has no package yet. */
+  latestVersionNo: number | null;
+  /** A specific version was requested and it doesn't exist for this item. */
+  missingVersion: boolean;
+  /** The creator's platforms, for the repurposing editor. */
+  platforms: Platform[];
 }
 
 export type GetStudioItemResult = { ok: true; item: StudioItem } | { ok: false; code: "not_found" | "read_error" };
 
+const VERSION_COLUMNS = "version_no, source, note, created_at, content";
+
+const versionRow = z.object({
+  version_no: z.number(),
+  source: authorSource,
+  note: z.string().nullable(),
+  created_at: z.string(),
+  content: z.unknown(),
+});
+
+function toVersion(row: unknown): StudioVersion | null {
+  const parsed = versionRow.safeParse(row);
+  if (!parsed.success) return null;
+  const { content, ...rest } = parsed.data;
+  const stored = parseStoredPackage(content);
+  if (!stored.ok) logEvent("warn", "studio_read_skipped", { stage: "version_validate" });
+  return { ...rest, package: stored.ok ? stored.package : null };
+}
+
 /**
- * One of the creator's items with its latest version, for /app/studio/[id].
- * An invalid id, a missing item or another creator's item is `not_found`.
- * Never throws.
+ * One of the creator's items with the version in view (`options.versionNo`, else the
+ * latest), for /app/studio/[id]. An invalid id, a missing item or another
+ * creator's item is `not_found`. Never throws.
  */
 export async function getStudioItem(
   client: ReadClient,
   userId: string,
   itemId: unknown,
   tz: string | null,
-  now: number = Date.now(),
+  options: { now?: number; versionNo?: number | null } = {},
 ): Promise<GetStudioItemResult> {
+  const now = options.now ?? Date.now();
+  const versionNo = options.versionNo ?? null;
   const id = uuid.safeParse(itemId);
   if (!id.success) return { ok: false, code: "not_found" };
+  const versions = () =>
+    client.from("content_versions").select(VERSION_COLUMNS).eq("user_id", userId).eq("content_item_id", id.data);
   try {
-    const [loaded, version] = await Promise.all([
+    const [loaded, latest, requested, platforms] = await Promise.all([
       readItem(client, userId, id.data, "studio_read_failed"),
-      client
-        .from("content_versions")
-        .select("version_no, content, created_at")
-        .eq("user_id", userId)
-        .eq("content_item_id", id.data)
-        .order("version_no", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
+      versions().order("version_no", { ascending: false }).limit(1).maybeSingle(),
+      versionNo === null ? null : versions().eq("version_no", versionNo).maybeSingle(),
+      readPlatforms(client, userId, "studio_read_failed"),
     ]);
     if (!loaded.ok) return loaded;
-    if (version.error) {
-      logEvent("error", "studio_read_failed", { stage: "version", db_code: version.error.code });
+    const error = latest.error ?? requested?.error;
+    if (error) {
+      logEvent("error", "studio_read_failed", { stage: "version", db_code: error.code });
       return { ok: false, code: "read_error" };
     }
+    if (!platforms.ok) return { ok: false, code: "read_error" };
 
+    const latestVersion = latest.data ? toVersion(latest.data) : null;
+    const version = requested ? (requested.data ? toVersion(requested.data) : null) : latestVersion;
     const { item } = loaded;
-    let latest: StudioItem["latest"] = null;
-    if (version.data) {
-      const stored = parseStoredPackage(version.data.content);
-      if (!stored.ok) logEvent("warn", "studio_read_skipped", { stage: "version_validate" });
-      latest = {
-        version_no: version.data.version_no,
-        created_at: version.data.created_at,
-        package: stored.ok ? stored.package : null,
-      };
-    }
-
     const scheduled = item.status === "scheduled" ? item.scheduled_for : null;
     return {
       ok: true,
@@ -544,11 +1001,65 @@ export async function getStudioItem(
         date: scheduled && tz ? localDateKey(scheduled, tz) : null,
         time: scheduled && tz ? localTimeKey(scheduled, tz) : null,
         passed: scheduled !== null && Date.parse(scheduled) < now,
-        latest,
+        version,
+        latestVersionNo: latestVersion?.version_no ?? null,
+        missingVersion: requested !== null && !requested.data,
+        platforms: platforms.platforms,
       },
     };
   } catch (error) {
     unexpected("studio_read_failed", error);
     return { ok: false, code: "read_error" };
+  }
+}
+
+export interface VersionSummary {
+  version_no: number;
+  source: AuthorSource;
+  note: string | null;
+  created_at: string;
+  /** Local date and time in the creator's zone, when one is known. */
+  date: string | null;
+  time: string | null;
+}
+
+/** The item's latest 20 versions, newest first, without their content. Never throws. */
+export async function listVersions(
+  client: ReadClient,
+  userId: string,
+  itemId: unknown,
+  tz: string | null,
+): Promise<{ ok: true; versions: VersionSummary[] } | { ok: false }> {
+  const id = uuid.safeParse(itemId);
+  if (!id.success) return { ok: false };
+  try {
+    const rows = await client
+      .from("content_versions")
+      .select("version_no, source, note, created_at")
+      .eq("user_id", userId)
+      .eq("content_item_id", id.data)
+      .order("version_no", { ascending: false })
+      .limit(HISTORY_LIMIT);
+    if (rows.error) {
+      logEvent("error", "studio_read_failed", { stage: "history", db_code: rows.error.code });
+      return { ok: false };
+    }
+    const versions: VersionSummary[] = [];
+    for (const row of rows.data ?? []) {
+      const parsed = versionRow.omit({ content: true }).safeParse(row);
+      if (!parsed.success) {
+        logEvent("warn", "studio_read_skipped", { stage: "history_validate" });
+        continue;
+      }
+      versions.push({
+        ...parsed.data,
+        date: tz ? localDateKey(parsed.data.created_at, tz) : null,
+        time: tz ? localTimeKey(parsed.data.created_at, tz) : null,
+      });
+    }
+    return { ok: true, versions };
+  } catch (error) {
+    unexpected("studio_read_failed", error);
+    return { ok: false };
   }
 }

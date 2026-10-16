@@ -4,10 +4,21 @@ import { parseWith } from "@/lib/schemas/parse";
 import {
   contentPackageModelSchemaFor,
   contentPackageOutputFor,
+  describeIssue,
+  downloadFileName,
   formatRulesFor,
   normalizeHashtags,
+  packageToText,
   parseStoredPackage,
+  pickSection,
+  SECTION_FIELDS,
+  SECTION_KEYS,
+  sectionInputFor,
+  sectionModelSchemaFor,
+  sectionOutputFor,
+  sectionTexts,
   STUDIO_ERRORS,
+  userPackageFor,
 } from "@/lib/schemas/studio";
 import { validPackage } from "./studio-fixture";
 
@@ -139,5 +150,90 @@ describe("normalizeHashtags and errors", () => {
       expect(message.length).toBeGreaterThan(10);
       expect(message).not.toMatch(/openai|supabase|sql|token/i);
     }
+  });
+});
+
+describe("section schemas", () => {
+  const stored = () => {
+    const parsed = parseWith(youtubeLong, validPackage());
+    if (!parsed.ok) throw new Error("fixture");
+    return parsed.data;
+  };
+
+  it.each(SECTION_KEYS)("the %s model schema is strict-mode safe and covers only its fields", (section) => {
+    const schema = sectionModelSchemaFor(section, ["youtube", "tiktok"]);
+    expect(optionalPaths(z.toJSONSchema(schema) as JsonNode)).toEqual([]);
+    expect(Object.keys(schema.shape).sort()).toEqual([...SECTION_FIELDS[section]].sort());
+  });
+
+  it("never lets a regenerated thumbnail be null", () => {
+    expect(sectionModelSchemaFor("thumbnail", ["youtube"]).safeParse({ thumbnail: null }).success).toBe(false);
+    expect(parseWith(sectionOutputFor("thumbnail", { platforms: ["youtube"], video: true }), { thumbnail: null }).ok).toBe(false);
+  });
+
+  it("needs 3 shots for video and 1 otherwise", () => {
+    const two = { shot_list: [{ shot: "a", notes: null }, { shot: "b", notes: null }] };
+    expect(parseWith(sectionOutputFor("shot_list", { platforms: ["youtube"], video: true }), two).ok).toBe(false);
+    expect(parseWith(sectionOutputFor("shot_list", { platforms: ["youtube"], video: false }), two).ok).toBe(true);
+    expect(parseWith(sectionOutputFor("shot_list", { platforms: ["youtube"], video: false }), { shot_list: [] }).ok).toBe(false);
+  });
+
+  it("checks regenerated repurposing platforms and bounds", () => {
+    const schema = sectionOutputFor("repurposing", { platforms: ["youtube"], video: true });
+    expect(parseWith(schema, { repurposing: [{ platform: "tiktok", format: "f", adaptation: "a" }] }).ok).toBe(false);
+    expect(parseWith(schema, { repurposing: [{ platform: "youtube", format: "f", adaptation: "a" }] }).ok).toBe(true);
+    expect(parseWith(sectionOutputFor("cta", { platforms: ["youtube"], video: true }), { cta: "x".repeat(201) }).ok).toBe(false);
+  });
+
+  it("sectionInputFor trims strings, strips unknown keys and rejects bad shapes", () => {
+    const parsed = sectionInputFor("caption").safeParse({ caption: "  Hi  ", hashtags: ["#a b"], titles: [] });
+    expect(parsed.success && parsed.data).toEqual({ caption: "Hi", hashtags: ["ab"] });
+    expect(sectionInputFor("titles").safeParse({ titles: "one" }).success).toBe(false);
+    expect(sectionInputFor("cta").safeParse({}).success).toBe(false);
+  });
+
+  it("pickSection returns only the section's fields", () => {
+    expect(pickSection(stored(), "caption")).toEqual({ caption: stored().caption, hashtags: stored().hashtags });
+  });
+
+  it("userPackageFor drops the AI-only format rules but keeps the platform check", () => {
+    const relaxed = { ...stored(), shot_list: [], thumbnail: null };
+    expect(userPackageFor({ platforms: ["youtube", "tiktok"] }).safeParse(relaxed).success).toBe(true);
+    expect(userPackageFor({ platforms: ["youtube"] }).safeParse(stored()).success).toBe(false);
+  });
+
+  it("describeIssue turns issues into sentences a creator can act on", () => {
+    const issues = (input: unknown) => sectionInputFor("titles").safeParse(input).error!.issues;
+    const titles = validPackage().titles.map((title, i) => (i === 1 ? { ...title, text: "x".repeat(101) } : title));
+    expect(describeIssue(issues({ titles })[0])).toBe("Title 2 text is too long (max 100 characters).");
+    expect(describeIssue(issues({ titles: [titles[0]] })[0])).toBe("Title: use at least 3.");
+  });
+});
+
+describe("plain text", () => {
+  const pkg = () => {
+    const parsed = parseWith(linkedinPost, { ...validPackage({ shot_list: [], thumbnail: null, repurposing: [] }) });
+    if (!parsed.ok) throw new Error("fixture");
+    return parsed.data;
+  };
+
+  it("joins every non-empty section with headings, identical to the per-section copy text", () => {
+    const texts = sectionTexts(pkg());
+    const all = packageToText(pkg(), "10-minute squats");
+    expect(all.startsWith("10-minute squats\n\nTITLES\n1. 10-minute squats for busy parents")).toBe(true);
+    expect(all).toContain(`CAPTION\n${texts.caption}`);
+    expect(all).toContain("#homeworkout #busyparents");
+    expect(all).not.toContain("SHOT LIST");
+    expect(all).not.toContain("THUMBNAIL");
+    for (const key of SECTION_KEYS) if (texts[key]) expect(all).toContain(texts[key]);
+  });
+
+  it.each([
+    ["10-Minute Squats!", "10-minute-squats.txt"],
+    ["Café   crème", "cafe-creme.txt"],
+    ["???", "content-package.txt"],
+    ["a".repeat(80), `${"a".repeat(60)}.txt`],
+  ])("downloadFileName(%s) = %s", (title, expected) => {
+    expect(downloadFileName(title)).toBe(expected);
   });
 });

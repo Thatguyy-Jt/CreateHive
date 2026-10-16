@@ -4,14 +4,23 @@ import type { AiResult } from "@/lib/ai/run-structured";
 import type { ContentPackageModelOutput, StudioPackage } from "@/lib/schemas/studio";
 import { STUDIO_ERRORS } from "@/lib/schemas/studio";
 import type { CreatorContext } from "@/lib/services/creator-context";
+import { parseWith } from "@/lib/schemas/parse";
+import { studioPackage } from "@/lib/schemas/studio";
 import {
   CONTEXT_CHAR_LIMIT,
+  discardStudioItem,
   generateContentPackage,
   getStudioItem,
   listStudioItems,
+  listVersions,
+  regenerableSections,
+  regenerateSection,
   renderCappedContext,
+  restoreVersion,
+  savePackageSection,
   scheduleStudioItem,
   startStudioItem,
+  type SectionDeps,
   type StudioDeps,
 } from "@/lib/services/studio";
 import { validPackage } from "../schemas/studio-fixture";
@@ -235,7 +244,7 @@ describe("generateContentPackage", () => {
     expect(inserts(queries)).toEqual([]);
   });
 
-  it("counts only this item's AI versions in the last 24 hours, and pending package generations in 2 minutes", async () => {
+  it("counts only this item's whole-package versions in 24 hours, and pending Studio generations in 2 minutes", async () => {
     const { client, queries } = setup();
     await generateContentPackage(client, USER_ID, ITEM_ID, { run: succeed(), now: () => NOW });
     const cap = queries.find((q) => q.table === "content_versions" && q.options)!;
@@ -243,12 +252,13 @@ describe("generateContentPackage", () => {
       ["eq", "user_id", USER_ID],
       ["eq", "content_item_id", ITEM_ID],
       ["eq", "source", "ai"],
+      ["eq", "note", "Generated package"],
       ["gte", "created_at", "2026-10-13T09:00:00.000Z"],
     ]);
     const pending = queries.find((q) => q.table === "ai_generations")!;
     expect(pending.filters).toEqual([
       ["eq", "user_id", USER_ID],
-      ["eq", "kind", "content_package"],
+      ["in", "kind", ["content_package", "content_section"]],
       ["eq", "status", "pending"],
       ["gte", "created_at", "2026-10-14T08:58:00.000Z"],
     ]);
@@ -458,22 +468,372 @@ describe("listStudioItems", () => {
   });
 });
 
-describe("getStudioItem", () => {
-  const storedPackage = () => {
-    const pkg = validPackage();
-    return { schema_version: 1, package: { ...pkg, script: { beats: pkg.script.beats } } };
-  };
 
-  function itemSetup(item: unknown, version: FakeResult) {
-    return fakeSupabase({ content_items: { data: item }, content_versions: version });
-  }
+// ---------------------------------------------------------------------------
+// Part 2: versions, editing, section regeneration, discard
+// ---------------------------------------------------------------------------
 
-  it("returns the item with its idea and latest readable package, in the creator's timezone", async () => {
-    const scheduled = { ...itemRow, status: "scheduled", scheduled_for: "2026-10-13T08:00:00+00:00" };
-    const { client, queries } = itemSetup(scheduled, {
-      data: { version_no: 2, content: storedPackage(), created_at: "2026-10-14T00:00:00Z" },
+/** A stored package as the database holds it (normalised through the app schema). */
+function storedPkg(overrides: Partial<ContentPackageModelOutput> = {}): StudioPackage {
+  const parsed = parseWith(studioPackage, validPackage(overrides));
+  if (!parsed.ok) throw new Error("fixture");
+  return parsed.data;
+}
+const stored = (pkg: StudioPackage = storedPkg()) => ({ schema_version: 1, package: pkg });
+
+interface VersionOptions extends Options {
+  /** The latest version row (`version_no, content`), or null for none. */
+  latestRow?: { version_no: number; content: unknown } | null;
+  /** The restore target (`content`). */
+  target?: { content: unknown } | null;
+  /** Full rows for getStudioItem: the latest and a requested one. */
+  latestFull?: unknown;
+  requestedFull?: unknown;
+  history?: unknown[];
+  versionsError?: FakeResult["error"];
+}
+
+function versionSetup(options: VersionOptions = {}) {
+  return fakeSupabase({
+    content_items: (query) =>
+      query.columns?.startsWith("title, platform")
+        ? { data: options.recentContent ?? [] }
+        : { data: options.item === undefined ? itemRow : options.item, error: options.itemError ?? null },
+    creator_profiles: { data: options.profile === undefined ? profileRow : options.profile },
+    brand_profiles: { data: { tone: "warm", voice_traits: [], do_list: [], dont_list: [], sample_text: null } },
+    content_pillars: { data: [{ name: "Quick workouts", description: null }] },
+    creator_strategies: { data: options.strategy === undefined ? strategyRow : options.strategy },
+    analytics_snapshots: { data: [] },
+    creator_insights: { data: [] },
+    ai_generations: { count: options.pendingCount ?? 0 },
+    content_versions: (query) => {
+      if (options.versionsError) return { error: options.versionsError };
+      if (query.op === "insert") return options.insert ?? {};
+      if (query.options) return { count: options.recentCount ?? 0, error: options.recentError ?? null };
+      if (query.columns === "version_no, content") {
+        return { data: options.latestRow === undefined ? { version_no: 2, content: stored() } : options.latestRow };
+      }
+      if (query.columns === "content") return { data: options.target === undefined ? { content: stored() } : options.target };
+      if (query.columns === "version_no, source, note, created_at") return { data: options.history ?? [] };
+      const requested = query.filters.some(([method, column]) => method === "eq" && column === "version_no");
+      return { data: requested ? (options.requestedFull ?? null) : (options.latestFull ?? null) };
+    },
+  });
+}
+
+const newTitles = [
+  { text: "  My own title  ", why: "Because I said so." },
+  { text: "Second title", why: "Clear." },
+  { text: "Third title", why: "Short." },
+];
+
+describe("savePackageSection", () => {
+  it("merges only the edited section into the latest package and stores it as a user version", async () => {
+    const { client, queries } = versionSetup();
+    await expect(
+      savePackageSection(client, USER_ID, ITEM_ID, { baseVersion: 2, section: "titles", value: { titles: newTitles, extra: 1 } }),
+    ).resolves.toEqual({ ok: true, versionNo: 3 });
+    const [insert] = inserts(queries);
+    const payload = insert.payload as { content: { package: StudioPackage }; [key: string]: unknown };
+    expect(payload).toMatchObject({ user_id: USER_ID, content_item_id: ITEM_ID, version_no: 3, source: "user", note: "Edited titles" });
+    expect(payload.ai_generation_id).toBeUndefined();
+    expect(payload.content.package.titles[0].text).toBe("My own title");
+    // Everything else is the latest package, untouched.
+    expect({ ...payload.content.package, titles: storedPkg().titles }).toEqual(storedPkg());
+  });
+
+  it("lets a creator save fewer than 3 shots and remove the thumbnail", async () => {
+    const shots = versionSetup();
+    await expect(
+      savePackageSection(shots.client, USER_ID, ITEM_ID, {
+        baseVersion: 2,
+        section: "shot_list",
+        value: { shot_list: [{ shot: "Just one", notes: "" }] },
+      }),
+    ).resolves.toMatchObject({ ok: true });
+    expect((inserts(shots.queries)[0].payload as { content: { package: StudioPackage } }).content.package.shot_list).toEqual([
+      { shot: "Just one", notes: null },
+    ]);
+    const thumb = versionSetup();
+    await expect(
+      savePackageSection(thumb.client, USER_ID, ITEM_ID, { baseVersion: 2, section: "thumbnail", value: { thumbnail: null } }),
+    ).resolves.toMatchObject({ ok: true });
+  });
+
+  it("is a conflict when the latest version moved on, and stores nothing", async () => {
+    const { client, queries } = versionSetup({ latestRow: { version_no: 3, content: stored() } });
+    await expect(
+      savePackageSection(client, USER_ID, ITEM_ID, { baseVersion: 2, section: "cta", value: { cta: "New" } }),
+    ).resolves.toEqual({ ok: false, code: "version_conflict", ...STUDIO_ERRORS.version_conflict });
+    expect(inserts(queries)).toEqual([]);
+  });
+
+  it("is a conflict when another save took the version number first", async () => {
+    const { client } = versionSetup({ insert: { error: pgError("23505", "duplicate key") } });
+    await expect(
+      savePackageSection(client, USER_ID, ITEM_ID, { baseVersion: 2, section: "cta", value: { cta: "New" } }),
+    ).resolves.toMatchObject({ code: "version_conflict" });
+  });
+
+  it.each([
+    ["an over-long CTA", { section: "cta", value: { cta: "x".repeat(201) } }, "Call to action is too long (max 200 characters)."],
+    ["an empty caption", { section: "caption", value: { caption: "  ", hashtags: [] } }, "Caption can't be empty."],
+    ["2 beats", { section: "script", value: { script: { beats: [{ label: "a", say: "b", show: null }, { label: "c", say: "d", show: null }] } } }, "Beat: use at least 3."],
+    ["a platform the creator doesn't use", { section: "repurposing", value: { repurposing: [{ platform: "linkedin", format: "post", adaptation: "a" }] } }, "Repurposing must target one of your platforms."],
+  ])("rejects %s with a readable message and stores nothing", async (_label, edit, message) => {
+    const { client, queries } = versionSetup();
+    await expect(savePackageSection(client, USER_ID, ITEM_ID, { baseVersion: 2, ...edit })).resolves.toEqual({
+      ok: false,
+      code: "invalid_input",
+      message,
+      retryable: false,
     });
-    const result = await getStudioItem(client, USER_ID, ITEM_ID, TZ, NOW);
+    expect(inserts(queries)).toEqual([]);
+  });
+
+  it.each([
+    ["an unknown section", { baseVersion: 2, section: "music", value: {} }, "invalid_input"],
+    ["a missing base version", { section: "cta", value: { cta: "x" } }, "invalid_input"],
+  ])("rejects %s without reading anything", async (_label, input, code) => {
+    const { client, queries } = versionSetup();
+    await expect(savePackageSection(client, USER_ID, ITEM_ID, input)).resolves.toMatchObject({ code });
+    expect(queries).toEqual([]);
+  });
+
+  it.each([
+    ["an invalid id", "x", {}, "not_found"],
+    ["a missing (or another creator's) item", ITEM_ID, { item: null }, "not_found"],
+    ["a published item", ITEM_ID, { item: { ...itemRow, status: "published" } }, "not_editable"],
+    ["no package yet", ITEM_ID, { latestRow: null }, "version_not_found"],
+    ["an unreadable latest version", ITEM_ID, { latestRow: { version_no: 2, content: { schema_version: 9 } } }, "unreadable_version"],
+    ["100 versions", ITEM_ID, { latestRow: { version_no: 100, content: stored() } }, "version_limit"],
+  ] as const)("refuses %s", async (_label, id, options, code) => {
+    const { client, queries } = versionSetup(options as VersionOptions);
+    const base = "latestRow" in options && options.latestRow ? options.latestRow.version_no : 2;
+    await expect(
+      savePackageSection(client, USER_ID, id, { baseVersion: base, section: "cta", value: { cta: "New" } }),
+    ).resolves.toMatchObject({ ok: false, code });
+    expect(inserts(queries)).toEqual([]);
+  });
+});
+
+describe("restoreVersion", () => {
+  it("copies the chosen version into a new latest version", async () => {
+    const old = storedPkg({ cta: "The old CTA" });
+    const { client, queries } = versionSetup({ target: { content: stored(old) } });
+    await expect(restoreVersion(client, USER_ID, ITEM_ID, { versionNo: 1, baseVersion: 2 })).resolves.toEqual({
+      ok: true,
+      versionNo: 3,
+    });
+    const target = queries.find((q) => q.table === "content_versions" && q.columns === "content")!;
+    expect(target.filters).toEqual(
+      expect.arrayContaining([
+        ["eq", "user_id", USER_ID],
+        ["eq", "content_item_id", ITEM_ID],
+        ["eq", "version_no", 1],
+      ]),
+    );
+    expect(inserts(queries)[0].payload).toMatchObject({
+      version_no: 3,
+      source: "user",
+      note: "Restored version 1",
+      content: { schema_version: 1, package: old },
+    });
+  });
+
+  it.each([
+    ["the latest version", { versionNo: 2, baseVersion: 2 }, {}, "already_latest"],
+    ["a stale base version", { versionNo: 1, baseVersion: 1 }, {}, "version_conflict"],
+    ["a missing version", { versionNo: 7, baseVersion: 2 }, { target: null }, "version_not_found"],
+    ["an unreadable version", { versionNo: 1, baseVersion: 2 }, { target: { content: {} } }, "unreadable_version"],
+    ["bad input", { versionNo: 0, baseVersion: 2 }, {}, "invalid_input"],
+  ] as const)("refuses %s and stores nothing", async (_label, input, options, code) => {
+    const { client, queries } = versionSetup(options as VersionOptions);
+    await expect(restoreVersion(client, USER_ID, ITEM_ID, input)).resolves.toMatchObject({ ok: false, code });
+    expect(inserts(queries)).toEqual([]);
+  });
+});
+
+/** Returns `output` through the request's validator, as `runStructured` does. */
+const sectionSucceeds = (output: unknown) =>
+  vi.fn<SectionDeps["run"]>(async (request) => {
+    const validated = request.validate!(output as never);
+    if (!validated.ok) return { ok: false as const, code: "invalid_output" as const, ...AI_ERRORS.invalid_output };
+    return {
+      ok: true as const,
+      data: validated.data,
+      generationId: "gen_section",
+      usage: { model: "m", tier: "quality" as const, inputTokens: 1, outputTokens: 1, latencyMs: 1, costMicros: 1 },
+    };
+  });
+
+const freshHooks = {
+  hooks: [
+    { text: "New hook one", why: "Sharper." },
+    { text: "New hook two", why: "Shorter." },
+    { text: "New hook three", why: "Warmer." },
+  ],
+};
+
+describe("regenerateSection", () => {
+  it("regenerates only that section with the current package as context, and stores an AI version", async () => {
+    const { client, queries } = versionSetup();
+    const run = sectionSucceeds(freshHooks);
+    await expect(
+      regenerateSection(client, USER_ID, ITEM_ID, { section: "hooks", baseVersion: 2, instruction: "  make them punchier " }, {
+        run,
+        now: () => NOW,
+      }),
+    ).resolves.toEqual({ ok: true, versionNo: 3 });
+
+    const request = run.mock.calls[0][0];
+    expect(request).toMatchObject({ userId: USER_ID, kind: "content_section" });
+    expect(request.input).toMatchObject({ section: "hooks", instruction: "make them punchier", platforms: ["youtube", "tiktok"] });
+    expect(request.input.packageSections.find((entry) => entry.section === "cta")?.text).toBe(validPackage().cta);
+    expect(JSON.stringify(request.input)).not.toContain("http");
+
+    const payload = inserts(queries)[0].payload as { content: { package: StudioPackage }; [key: string]: unknown };
+    expect(payload).toMatchObject({ version_no: 3, source: "ai", note: "Regenerated hooks", ai_generation_id: "gen_section" });
+    expect(payload.content.package.hooks).toEqual(freshHooks.hooks);
+    expect({ ...payload.content.package, hooks: storedPkg().hooks }).toEqual(storedPkg());
+  });
+
+  it("counts this item's section regenerations in 24 hours and pending Studio generations", async () => {
+    const { client, queries } = versionSetup();
+    await regenerateSection(client, USER_ID, ITEM_ID, { section: "hooks", baseVersion: 2, instruction: null }, {
+      run: sectionSucceeds(freshHooks),
+      now: () => NOW,
+    });
+    const cap = queries.find((q) => q.table === "content_versions" && q.options)!;
+    expect(cap.filters).toEqual([
+      ["eq", "user_id", USER_ID],
+      ["eq", "content_item_id", ITEM_ID],
+      ["eq", "source", "ai"],
+      ["like", "note", "Regenerated %"],
+      ["gte", "created_at", "2026-10-13T09:00:00.000Z"],
+    ]);
+    const pending = queries.find((q) => q.table === "ai_generations")!;
+    expect(pending.filters).toEqual(expect.arrayContaining([["in", "kind", ["content_package", "content_section"]]]));
+  });
+
+  it.each([
+    ["10 regenerations in 24 hours", { recentCount: 10 }, "section_limit"],
+    ["a pending generation", { pendingCount: 1 }, "in_progress"],
+    ["a stale base version", { latestRow: { version_no: 5, content: stored() } }, "version_conflict"],
+    ["an unreadable latest version", { latestRow: { version_no: 2, content: {} } }, "unreadable_version"],
+    ["no package yet", { latestRow: null }, "version_not_found"],
+    ["no strategy", { strategy: null }, "missing_context"],
+    ["a published item", { item: { ...itemRow, status: "published" } }, "not_editable"],
+  ] as const)("refuses %s without calling AI or storing", async (_label, options, code) => {
+    const { client, queries } = versionSetup(options as VersionOptions);
+    const run = sectionSucceeds(freshHooks);
+    await expect(
+      regenerateSection(client, USER_ID, ITEM_ID, { section: "hooks", baseVersion: 2, instruction: null }, { run, now: () => NOW }),
+    ).resolves.toEqual({ ok: false, code, ...STUDIO_ERRORS[code] });
+    expect(run).not.toHaveBeenCalled();
+    expect(inserts(queries)).toEqual([]);
+  });
+
+  it.each([
+    ["an over-long instruction", { section: "hooks", baseVersion: 2, instruction: "x".repeat(201) }],
+    ["an unknown section", { section: "music", baseVersion: 2, instruction: null }],
+  ])("rejects %s without reading anything", async (_label, input) => {
+    const { client, queries } = versionSetup();
+    await expect(
+      regenerateSection(client, USER_ID, ITEM_ID, input, { run: sectionSucceeds(freshHooks) }),
+    ).resolves.toMatchObject({ code: "invalid_input" });
+    expect(queries).toEqual([]);
+  });
+
+  it("refuses a shot list for a written item with no shots", async () => {
+    const written = { ...itemRow, platform: "linkedin", format: "text post" };
+    const { client } = versionSetup({ item: written, latestRow: { version_no: 2, content: stored(storedPkg({ shot_list: [] })) } });
+    const run = sectionSucceeds({ shot_list: [] });
+    await expect(
+      regenerateSection(client, USER_ID, ITEM_ID, { section: "shot_list", baseVersion: 2, instruction: null }, { run }),
+    ).resolves.toMatchObject({ code: "invalid_input" });
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["a video shot list with 2 shots", "shot_list", { shot_list: [{ shot: "a", notes: null }, { shot: "b", notes: null }] }],
+    ["a null thumbnail", "thumbnail", { thumbnail: null }],
+    ["4 titles", "titles", { titles: [...newTitles, newTitles[0]] }],
+  ])("rejects regenerated output with %s and stores nothing", async (_label, section, output) => {
+    const { client, queries } = versionSetup();
+    await expect(
+      regenerateSection(client, USER_ID, ITEM_ID, { section, baseVersion: 2, instruction: null }, {
+        run: sectionSucceeds(output),
+        now: () => NOW,
+      }),
+    ).resolves.toMatchObject({ code: "invalid_output", retryable: true });
+    expect(inserts(queries)).toEqual([]);
+  });
+
+  it("passes AI failures through and stores nothing", async () => {
+    const { client, queries } = versionSetup();
+    const run = vi.fn<SectionDeps["run"]>(async () => ({ ok: false as const, code: "disabled" as const, ...AI_ERRORS.disabled }));
+    await expect(
+      regenerateSection(client, USER_ID, ITEM_ID, { section: "hooks", baseVersion: 2, instruction: null }, { run }),
+    ).resolves.toEqual({ ok: false, code: "disabled", ...STUDIO_ERRORS.disabled });
+    expect(inserts(queries)).toEqual([]);
+  });
+});
+
+describe("regenerableSections", () => {
+  it("offers the shot list and thumbnail only when the format needs them or they exist", () => {
+    const empty = storedPkg({ shot_list: [], thumbnail: null });
+    expect(regenerableSections(empty, { video: false, thumbnailRequired: false })).toEqual([
+      "titles",
+      "hooks",
+      "script",
+      "caption",
+      "cta",
+      "repurposing",
+    ]);
+    expect(regenerableSections(empty, { video: true, thumbnailRequired: true })).toContain("thumbnail");
+    expect(regenerableSections(storedPkg(), { video: false, thumbnailRequired: false })).toEqual(
+      expect.arrayContaining(["shot_list", "thumbnail"]),
+    );
+  });
+});
+
+describe("discardStudioItem", () => {
+  it("calls discard_studio_item with the item id only", async () => {
+    const { client, rpcCalls } = fakeSupabase({}, () => ({}));
+    await expect(discardStudioItem(client, USER_ID, ITEM_ID)).resolves.toEqual({ ok: true });
+    expect(rpcCalls).toEqual([{ name: "discard_studio_item", args: { p_item_id: ITEM_ID } }]);
+  });
+
+  it.each([
+    ["item_not_found", "not_found"],
+    ["item_not_draft", "not_draft"],
+    ["boom", "db_error"],
+  ] as const)("maps %s to %s", async (message, code) => {
+    const { client } = fakeSupabase({}, () => ({ error: { code: "P0001", message } }));
+    await expect(discardStudioItem(client, USER_ID, ITEM_ID)).resolves.toEqual({ ok: false, code, ...STUDIO_ERRORS[code] });
+  });
+
+  it("refuses an invalid id without calling the database", async () => {
+    const { client, rpcCalls } = fakeSupabase({});
+    await expect(discardStudioItem(client, USER_ID, "x")).resolves.toMatchObject({ code: "not_found" });
+    expect(rpcCalls).toEqual([]);
+  });
+});
+
+describe("getStudioItem", () => {
+  const fullRow = (version_no: number, content: unknown = stored(), source = "ai", note: string | null = "Generated package") => ({
+    version_no,
+    source,
+    note,
+    content,
+    created_at: "2026-10-14T08:00:00+00:00",
+  });
+
+  it("returns the item with its idea, latest version and the creator's platforms, in their timezone", async () => {
+    const scheduled = { ...itemRow, status: "scheduled", scheduled_for: "2026-10-13T08:00:00+00:00" };
+    const { client, queries } = versionSetup({ item: scheduled, latestFull: fullRow(2) });
+    const result = await getStudioItem(client, USER_ID, ITEM_ID, TZ, { now: NOW });
     if (!result.ok) throw new Error("expected ok");
     expect(result.item).toMatchObject({
       id: ITEM_ID,
@@ -481,11 +841,14 @@ describe("getStudioItem", () => {
       date: "2026-10-13",
       time: "09:00",
       passed: true,
-      latest: { version_no: 2, package: expect.objectContaining({ cta: validPackage().cta }) },
+      latestVersionNo: 2,
+      missingVersion: false,
+      platforms: ["youtube", "tiktok"],
+      version: { version_no: 2, source: "ai", note: "Generated package", package: expect.objectContaining({ cta: validPackage().cta }) },
     });
     expect(result.item.idea?.evidence).toHaveLength(1);
-    const version = queries.find((q) => q.table === "content_versions")!;
-    expect(version.filters).toEqual(
+    const latest = queries.find((q) => q.table === "content_versions")!;
+    expect(latest.filters).toEqual(
       expect.arrayContaining([
         ["eq", "user_id", USER_ID],
         ["eq", "content_item_id", ITEM_ID],
@@ -495,28 +858,70 @@ describe("getStudioItem", () => {
     );
   });
 
-  it("marks an unreadable version instead of failing", async () => {
-    const { client } = itemSetup(itemRow, { data: { version_no: 1, content: { schema_version: 9 }, created_at: "x" } });
-    const result = await getStudioItem(client, USER_ID, ITEM_ID, TZ, NOW);
-    expect(result.ok && result.item.latest).toEqual({ version_no: 1, created_at: "x", package: null });
+  it("returns a requested older version alongside the latest version number", async () => {
+    const { client } = versionSetup({ latestFull: fullRow(3), requestedFull: fullRow(1, stored(), "user", "Edited titles") });
+    const result = await getStudioItem(client, USER_ID, ITEM_ID, TZ, { now: NOW, versionNo: 1 });
+    expect(result.ok && [result.item.version?.version_no, result.item.version?.source, result.item.latestVersionNo]).toEqual([
+      1,
+      "user",
+      3,
+    ]);
   });
 
-  it("has no latest version and no date for a fresh draft", async () => {
-    const { client } = itemSetup(itemRow, { data: null });
-    const result = await getStudioItem(client, USER_ID, ITEM_ID, TZ, NOW);
-    expect(result.ok && result.item).toMatchObject({ latest: null, date: null, time: null, passed: false });
+  it("flags a requested version that doesn't exist", async () => {
+    const { client } = versionSetup({ latestFull: fullRow(3), requestedFull: null });
+    const result = await getStudioItem(client, USER_ID, ITEM_ID, TZ, { now: NOW, versionNo: 9 });
+    expect(result.ok && result.item).toMatchObject({ version: null, missingVersion: true, latestVersionNo: 3 });
+  });
+
+  it("marks an unreadable version instead of failing", async () => {
+    const { client } = versionSetup({ latestFull: fullRow(1, { schema_version: 9 }) });
+    const result = await getStudioItem(client, USER_ID, ITEM_ID, TZ, { now: NOW });
+    expect(result.ok && result.item.version).toMatchObject({ version_no: 1, package: null });
+  });
+
+  it("has no version and no date for a fresh draft", async () => {
+    const { client } = versionSetup({ latestFull: null });
+    const result = await getStudioItem(client, USER_ID, ITEM_ID, TZ, { now: NOW });
+    expect(result.ok && result.item).toMatchObject({ version: null, latestVersionNo: null, date: null, time: null, passed: false });
   });
 
   it("is not_found for an invalid id, or a missing or another creator's item", async () => {
     const empty = fakeSupabase({});
     await expect(getStudioItem(empty.client, USER_ID, "not-a-uuid", TZ)).resolves.toEqual({ ok: false, code: "not_found" });
     expect(empty.queries).toEqual([]);
-    const { client } = itemSetup(null, { data: null });
+    const { client } = versionSetup({ item: null });
     await expect(getStudioItem(client, USER_ID, ITEM_ID, TZ)).resolves.toEqual({ ok: false, code: "not_found" });
   });
 
   it("is read_error when a read fails", async () => {
-    const { client } = itemSetup(itemRow, { error: pgError() });
+    const { client } = versionSetup({ versionsError: pgError() });
     await expect(getStudioItem(client, USER_ID, ITEM_ID, TZ)).resolves.toEqual({ ok: false, code: "read_error" });
+  });
+});
+
+describe("listVersions", () => {
+  it("lists the latest 20 versions without content, with local times", async () => {
+    const history = [
+      { version_no: 2, source: "user", note: "Edited titles", created_at: "2026-10-14T08:12:00+00:00" },
+      { version_no: 1, source: "ai", note: "Generated package", created_at: "2026-10-13T17:00:00+00:00" },
+      { version_no: 0, source: "robot", note: null, created_at: "x" },
+    ];
+    const { client, queries } = versionSetup({ history });
+    const result = await listVersions(client, USER_ID, ITEM_ID, TZ);
+    expect(result).toEqual({
+      ok: true,
+      versions: [
+        { ...history[0], date: "2026-10-14", time: "09:12" },
+        { ...history[1], date: "2026-10-13", time: "18:00" },
+      ],
+    });
+    expect(queries[0].filters).toEqual(expect.arrayContaining([["limit", 20], ["eq", "content_item_id", ITEM_ID]]));
+  });
+
+  it("fails soft on errors and invalid ids", async () => {
+    const { client } = versionSetup({ versionsError: pgError() });
+    await expect(listVersions(client, USER_ID, ITEM_ID, TZ)).resolves.toEqual({ ok: false });
+    await expect(listVersions(client, USER_ID, "x", TZ)).resolves.toEqual({ ok: false });
   });
 });
