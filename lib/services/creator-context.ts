@@ -1,6 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { baselineFor, type ComparisonLabel } from "@/lib/analytics/baseline";
+import { formatCount, formatPercent } from "@/lib/analytics/format";
 import { logEvent } from "@/lib/observability/log";
+import { signalLevel } from "@/lib/schemas/enums";
 import type { Database } from "@/lib/supabase/database.types";
+import { readPostSummaries, type PostSummary } from "./analytics";
 
 type ContextClient = Pick<SupabaseClient<Database>, "from">;
 
@@ -16,7 +20,10 @@ export const CONTEXT_SECTIONS = [
 export type ContextSection = (typeof CONTEXT_SECTIONS)[number];
 
 export const RECENT_CONTENT_LIMIT = 10;
-export const PERFORMANCE_LIMIT = 30;
+/** Newest posts with results in the performance section. */
+export const PERFORMANCE_LIMIT = 15;
+/** Active insights in the context, high confidence first. */
+export const INSIGHTS_LIMIT = 8;
 
 export interface ProfileContext {
   niche: string | null;
@@ -55,15 +62,21 @@ export interface ContentContext {
   published_at: string | null;
 }
 
+/** One published post with results, compared with the creator's usual on its platform. */
 export interface PerformanceContext {
+  title: string;
   platform: string | null;
-  captured_at: string;
+  format: string | null;
+  /** Date published (UTC), YYYY-MM-DD. */
+  posted: string;
+  /** Results captured a week or more after posting. */
+  settled: boolean;
+  /** Days from posting to the latest results. */
+  age_days: number | null;
   views: number | null;
-  likes: number | null;
-  comments: number | null;
-  shares: number | null;
-  saves: number | null;
-  follower_delta: number | null;
+  views_label: ComparisonLabel | null;
+  engagement_rate: number | null;
+  engagement_label: ComparisonLabel | null;
 }
 
 export interface InsightContext {
@@ -71,6 +84,7 @@ export interface InsightContext {
   summary: string;
   confidence: string | null;
   sample_size: number | null;
+  next_step: string | null;
 }
 
 /**
@@ -131,21 +145,53 @@ const LOADERS: Record<ContextSection, Loader> = {
       .eq("user_id", id)
       .order("created_at", { ascending: false })
       .limit(RECENT_CONTENT_LIMIT),
-  performance: (c, id) =>
-    c
-      .from("analytics_snapshots")
-      .select("platform, captured_at, views, likes, comments, shares, saves, follower_delta")
-      .eq("user_id", id)
-      .order("captured_at", { ascending: false })
-      .limit(PERFORMANCE_LIMIT),
-  insights: (c, id) =>
-    c
+  // Published posts with their latest check-in, compared with the creator's usual.
+  performance: async (c, id) => {
+    const read = await readPostSummaries(c, id);
+    return read.ok ? { data: performanceFrom(read.posts), error: null } : { data: null, error: {} };
+  },
+  insights: async (c, id) => {
+    const result = await c
       .from("creator_insights")
-      .select("insight_type, summary, confidence, sample_size")
+      .select("insight_type, summary, confidence, sample_size, next_step")
       .eq("user_id", id)
       .eq("status", "active")
-      .order("updated_at", { ascending: false }),
+      .order("updated_at", { ascending: false })
+      .limit(INSIGHTS_LIMIT);
+    if (result.error || !result.data) return result;
+    // High confidence first, so capped prompts drop the weakest insights first.
+    return { data: result.data.toSorted((a, b) => confidenceRank(b.confidence) - confidenceRank(a.confidence)), error: null };
+  },
 };
+
+function confidenceRank(value: string | null): number {
+  const parsed = signalLevel.safeParse(value);
+  return parsed.success ? { low: 1, medium: 2, high: 3 }[parsed.data] : 0;
+}
+
+/** The newest posts with results (`posts` is newest first), each compared with the others. */
+export function performanceFrom(posts: readonly PostSummary[]): PerformanceContext[] {
+  return posts
+    .filter((post) => post.latest !== null)
+    .slice(0, PERFORMANCE_LIMIT)
+    .map((post) => {
+      const comparison = baselineFor(post, posts);
+      const views = comparison.metrics.find((m) => m.metric === "views");
+      const engagement = comparison.metrics.find((m) => m.metric === "engagement_rate");
+      return {
+        title: post.title,
+        platform: post.platform,
+        format: post.format,
+        posted: post.published_at.slice(0, 10),
+        settled: comparison.settled,
+        age_days: comparison.ageDays,
+        views: views?.value ?? null,
+        views_label: views?.label ?? null,
+        engagement_rate: engagement?.value ?? null,
+        engagement_label: engagement?.label ?? null,
+      };
+    });
+}
 
 const isEmpty = (value: unknown) => value === null || value === undefined || (Array.isArray(value) && value.length === 0);
 
@@ -215,6 +261,13 @@ function block(section: string, lines: (string | null)[]): string | null {
   return `<creator_input section="${section}">\n${body.join("\n")}\n</creator_input>`;
 }
 
+/** "1,200 (above usual)", "1,200 (early, day 3)" or "-". */
+function reading(post: PerformanceContext, value: string | null, label: ComparisonLabel | null): string {
+  if (value === null) return "-";
+  if (!post.settled) return `${value} (early, day ${post.age_days ?? 0})`;
+  return `${value} (${label ? `${label} usual` : "no usual yet"})`;
+}
+
 /**
  * Stable, labelled prompt text shared by every agent. Creator-authored text is
  * wrapped in `<creator_input>` blocks, which prompts declare to be data, never
@@ -276,14 +329,24 @@ export function renderContextForPrompt(context: CreatorContext): string {
   }
   if (performance?.length) {
     parts.push(
-      `Performance snapshots (newest first; platform | captured | views | likes | comments | shares | saves | follower change):\n` +
-        performance
-          .map((s) =>
-            [s.platform ?? "-", s.captured_at, s.views, s.likes, s.comments, s.shares, s.saves, s.follower_delta]
-              .map((v) => (v === null ? "-" : String(v)))
-              .join(" | "),
-          )
-          .join("\n"),
+      block("performance", [
+        "Results per post, newest first, compared with the creator's usual on that platform",
+        "(title | platform | format | posted | views | engagement rate):",
+        ...performance.map((post) =>
+          [
+            clean(post.title),
+            post.platform ?? "-",
+            post.format ? clean(post.format) : "-",
+            post.posted,
+            reading(post, post.views === null ? null : formatCount(post.views), post.views_label),
+            reading(
+              post,
+              post.engagement_rate === null ? null : formatPercent(post.engagement_rate),
+              post.engagement_label,
+            ),
+          ].join(" | "),
+        ),
+      ]),
     );
   }
   if (insights?.length) {
@@ -293,7 +356,7 @@ export function renderContextForPrompt(context: CreatorContext): string {
         insights.map((i) =>
           `[${i.insight_type}${i.confidence ? `, ${i.confidence} confidence` : ""}${
             i.sample_size !== null ? `, n=${i.sample_size}` : ""
-          }] ${clean(i.summary)}`,
+          }] ${clean(i.summary)}${i.next_step ? ` Next: ${clean(i.next_step)}` : ""}`,
         ),
       ),
     );

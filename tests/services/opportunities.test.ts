@@ -28,15 +28,29 @@ const profileRow = {
 const brandRow = { tone: "warm", voice_traits: [], do_list: [], dont_list: ["No shaming"], sample_text: null };
 const strategyRow = { positioning: "Helps busy parents train at home", growth_objective: "g", monetization_objective: "m", version: 1 };
 const pillarRows = FIXTURE_PILLARS.map((name, index) => ({ id: `pillar_${index}`, name, description: `${name} desc` }));
-const snapshot = {
+/** A published post with one check-in, as `readPostSummaries` reads it. */
+const publishedPost = {
+  id: "post_1",
+  title: "Quick squat short",
   platform: "youtube",
-  captured_at: "2026-10-01T00:00:00Z",
-  views: 100,
-  likes: 5,
-  comments: 1,
-  shares: 0,
-  saves: 2,
-  follower_delta: 3,
+  format: "short",
+  published_at: "2026-09-20T00:00:00Z",
+  idea_id: null,
+  pillar: null,
+  analytics_snapshots: [
+    {
+      id: "snap_1",
+      captured_at: "2026-10-01T00:00:00Z",
+      views: 100,
+      likes: 5,
+      comments: 1,
+      shares: 0,
+      saves: 2,
+      follower_delta: 3,
+      avg_view_duration_seconds: null,
+      retention_rate: null,
+    },
+  ],
 };
 
 interface Options {
@@ -64,8 +78,8 @@ function setup(options: Options = {}) {
     brand_profiles: { data: brandRow },
     content_pillars: { data: options.pillars ?? pillarRows },
     creator_strategies: { data: options.strategy === undefined ? strategyRow : options.strategy },
-    content_items: { data: [] },
-    analytics_snapshots: { data: options.performance ?? [] },
+    content_items: (query) =>
+      query.columns?.startsWith("id, title") ? { data: options.performance ?? [] } : { data: [] },
     creator_insights: { data: [] },
     content_ideas: ideas,
     ai_generations: { count: options.pendingCount ?? 0 },
@@ -194,7 +208,7 @@ describe("generateContentOpportunities", () => {
     batch.opportunities[0] = validIdea(0, {
       evidence: [{ kind: "creator_history", summary: "Your quick-workout short had your most saves.", signal_ref: null }],
     });
-    const { client, queries } = setup({ performance: [snapshot] });
+    const { client, queries } = setup({ performance: [publishedPost] });
     const run = succeed(batch);
 
     await expect(generateContentOpportunities(client, USER_ID, { run })).resolves.toMatchObject({ ok: true });

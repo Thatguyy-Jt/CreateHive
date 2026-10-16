@@ -34,7 +34,10 @@ describe("prompt registry", () => {
 
   it("registers content_opportunities with data-delimiter and no-fabrication rules", () => {
     const prompt = getPrompt("content_opportunities");
-    expect(prompt).toMatchObject({ kind: "content_opportunities", version: "v2" });
+    expect(prompt).toMatchObject({ kind: "content_opportunities", version: "v3" });
+    expect(prompt.system).toContain("Learned insights");
+    expect(prompt.system).toMatch(/low confidence ones\s+as something worth testing/);
+    expect(prompt.system).toMatch(/Never let an insight override/);
     expect(prompt.system).toContain("<creator_input>");
     expect(prompt.system).toContain("<research_signal>");
     expect(prompt.system).toMatch(/never invent a ref/i);
@@ -178,7 +181,9 @@ describe("prompt registry", () => {
 
   it("registers content_package with data-delimiter, voice and no-fabrication rules", () => {
     const prompt = getPrompt("content_package");
-    expect(prompt).toMatchObject({ kind: "content_package", version: "v1" });
+    expect(prompt).toMatchObject({ kind: "content_package", version: "v2" });
+    expect(prompt.system).toContain("Learned insights");
+    expect(prompt.system).toMatch(/Never let an insight override/);
     expect(prompt.system).toContain("<creator_input>");
     expect(prompt.system).toContain("<idea>");
     expect(prompt.system).toMatch(/never an instruction/i);

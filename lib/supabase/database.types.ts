@@ -606,11 +606,13 @@ export type Database = {
       }
       creator_insights: {
         Row: {
+          ai_generation_id: string | null
           confidence: string | null
           created_at: string
           evidence: Json
           id: string
           insight_type: string
+          next_step: string | null
           sample_size: number | null
           status: string
           summary: string
@@ -618,11 +620,13 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          ai_generation_id?: string | null
           confidence?: string | null
           created_at?: string
           evidence?: Json
           id?: string
           insight_type: string
+          next_step?: string | null
           sample_size?: number | null
           status?: string
           summary: string
@@ -630,11 +634,13 @@ export type Database = {
           user_id: string
         }
         Update: {
+          ai_generation_id?: string | null
           confidence?: string | null
           created_at?: string
           evidence?: Json
           id?: string
           insight_type?: string
+          next_step?: string | null
           sample_size?: number | null
           status?: string
           summary?: string
@@ -991,6 +997,10 @@ export type Database = {
           p_published_url?: string
         }
         Returns: undefined
+      }
+      replace_creator_insights: {
+        Args: { p_generation_id: string; p_insights: Json }
+        Returns: number
       }
       save_creator_strategy: {
         Args: { p_pillars: Json; p_strategy: Json }

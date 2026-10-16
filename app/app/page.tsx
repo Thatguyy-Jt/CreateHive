@@ -2,7 +2,7 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { AiUsageLine, AiUsageLineFallback } from "@/components/dashboard/ai-usage-line";
-import { ComingSoonCards } from "@/components/dashboard/coming-soon-cards";
+import { LearnedCard } from "@/components/dashboard/learned-card";
 import { PerformanceCard } from "@/components/dashboard/performance-card";
 import { DashboardToday } from "@/components/dashboard/today-card";
 import { SectionSkeleton } from "@/components/settings/section-skeleton";
@@ -50,7 +50,9 @@ export default function DashboardPage() {
         <Suspense fallback={<CardSkeleton lines={3} />}>
           <PerformanceCard />
         </Suspense>
-        <ComingSoonCards />
+        <Suspense fallback={<CardSkeleton lines={3} />}>
+          <LearnedCard />
+        </Suspense>
       </div>
     </div>
   );

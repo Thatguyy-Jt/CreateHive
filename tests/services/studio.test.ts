@@ -86,7 +86,9 @@ interface Options {
 function setup(options: Options = {}) {
   return fakeSupabase({
     content_items: (query) =>
-      query.columns?.startsWith("title, platform")
+      query.columns?.startsWith("id, title, platform, format, published_at")
+        ? { data: [] }
+        : query.columns?.startsWith("title, platform")
         ? { data: options.recentContent ?? [] }
         : { data: options.item === undefined ? itemRow : options.item, error: options.itemError ?? null },
     creator_profiles: { data: options.profile === undefined ? profileRow : options.profile },
@@ -329,14 +331,16 @@ describe("renderCappedContext", () => {
         { title: "Oldest".padEnd(400, "!"), platform: null, format: null, status: "draft", published_at: null },
       ],
       performance: Array.from({ length: 20 }, (_, i) => ({
+        title: `Post ${i}`,
         platform: "youtube",
-        captured_at: `2026-10-${String(20 - i).padStart(2, "0")}T00:00:00Z`,
+        format: null,
+        posted: `2026-10-${String(20 - i).padStart(2, "0")}`,
+        settled: true,
+        age_days: 9,
         views: i,
-        likes: null,
-        comments: null,
-        shares: null,
-        saves: null,
-        follower_delta: null,
+        views_label: null,
+        engagement_rate: null,
+        engagement_label: null,
       })),
     };
     const rendered = renderCappedContext(context, 600);
@@ -496,7 +500,9 @@ interface VersionOptions extends Options {
 function versionSetup(options: VersionOptions = {}) {
   return fakeSupabase({
     content_items: (query) =>
-      query.columns?.startsWith("title, platform")
+      query.columns?.startsWith("id, title, platform, format, published_at")
+        ? { data: [] }
+        : query.columns?.startsWith("title, platform")
         ? { data: options.recentContent ?? [] }
         : { data: options.item === undefined ? itemRow : options.item, error: options.itemError ?? null },
     creator_profiles: { data: options.profile === undefined ? profileRow : options.profile },

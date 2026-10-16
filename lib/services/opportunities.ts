@@ -223,7 +223,7 @@ export async function generateContentOpportunities(
 
     // 6. Generate with per-request schemas: only evidence kinds and refs we can back up.
     const kinds = new Set<EvidenceKind>(["creator_input"]);
-    if (context.performance?.length) kinds.add("creator_history");
+    if (context.performance?.length || context.insights?.length) kinds.add("creator_history");
     for (const signal of signals) kinds.add(signal.kind);
     const allowedEvidenceKinds = [...kinds] as unknown as AllowedEvidenceKinds;
     const schema = opportunityOutputFor({

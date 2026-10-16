@@ -14,7 +14,7 @@ Mark a task `[x]` when it is finished. When every task in a phase is checked, ch
 | 2 | Creator Intelligence | ✅ DONE |
 | 3 | Opportunity Engine | ✅ DONE |
 | 4 | Content Studio | ✅ DONE |
-| 5 | Analytics and Learning | ⬜ Not done |
+| 5 | Analytics and Learning | ✅ DONE |
 | 6 | Billing | ⬜ Not done |
 | 7 | Reliability | ⬜ Not done |
 | 8 | Beta | ⬜ Not done |
@@ -66,14 +66,14 @@ Mark a task `[x]` when it is finished. When every task in a phase is checked, ch
 - [x] Save / edit / version (`content_items`, `content_versions`)
 - [x] Studio routes (`/app/studio`, `/app/studio/[id]`)
 
-## Phase 5 — Analytics and Learning — ⬜ Not done
+## Phase 5 — Analytics and Learning — ✅ DONE
 
 - [x] Analytics import / manual entry
 - [x] Performance snapshots (`analytics_snapshots`)
 - [x] AI diagnosis (`analyzeContentPerformance()`)
-- [ ] Creator insights (`creator_insights`, `updateCreatorInsights()`)
-- [ ] Learning feedback loop into recommendations
-- [ ] Analytics and insights routes (`/app/analytics`, `/app/insights`)
+- [x] Creator insights (`creator_insights`, `updateCreatorInsights()`)
+- [x] Learning feedback loop into recommendations
+- [x] Analytics and insights routes (`/app/analytics`, `/app/insights`)
 
 ## Phase 6 — Billing — ⬜ Not done
 
