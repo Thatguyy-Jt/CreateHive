@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Suspense } from "react";
+import { PageHeader } from "@/components/app-shell/page-header";
 import { PostContent } from "@/components/analytics/post-content";
 import { SectionSkeleton } from "@/components/settings/section-skeleton";
 
@@ -23,14 +23,7 @@ function PostSkeleton() {
 export default function PostResultsPage({ params }: PageProps<"/app/analytics/[id]">) {
   return (
     <div className="stack-lg max-w-3xl">
-      <div className="stack-sm">
-        <p>
-          <Link href="/app/analytics" className="link">
-            <span aria-hidden="true">←</span> All posts
-          </Link>
-        </p>
-        <h1>Post results</h1>
-      </div>
+      <PageHeader icon="analytics" title="Post results" back={{ href: "/app/analytics", label: "All posts" }} />
       <Suspense fallback={<PostSkeleton />}>
         <PostContent params={params} />
       </Suspense>

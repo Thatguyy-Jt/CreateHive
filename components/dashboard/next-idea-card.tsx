@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CardHeader } from "@/components/app-shell/card-header";
 import type { RankedIdea } from "@/lib/services/daily-recommendation";
 import { IdeaSummary } from "./idea-summary";
 
@@ -7,9 +8,11 @@ export function NextIdeaCard({ idea }: { idea: RankedIdea }) {
   const saved = idea.status === "saved";
   return (
     <section className="card stack-sm" aria-labelledby="dashboard-next-idea">
-      <h2 id="dashboard-next-idea" className="text-heading">
-        Next idea worth making
-      </h2>
+      <CardHeader icon="lightbulb">
+        <h2 id="dashboard-next-idea" className="text-heading">
+          Next idea worth making
+        </h2>
+      </CardHeader>
       <IdeaSummary idea={idea} />
       <div>
         <Link

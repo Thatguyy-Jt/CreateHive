@@ -6,6 +6,7 @@ import { logEvent } from "@/lib/observability/log";
 import { getTimezone } from "@/lib/services/calendar";
 import { getInsightsOverview, type InsightsOverview } from "@/lib/services/insights";
 import { createUserClient } from "@/lib/supabase/server";
+import { EmptyHero } from "../app-shell/empty-hero";
 import { InsightCard } from "./insight-card";
 import { UpdateControl } from "./update-control";
 
@@ -26,22 +27,22 @@ function dayLabel(instant: string, tz: string | null): string {
 
 function NotReady({ overview }: { overview: InsightsOverview }) {
   return (
-    <section className="card stack-sm" aria-labelledby="insights-ready">
-      <h2 id="insights-ready" className="text-heading">
-        Not enough results yet
-      </h2>
-      <p>
-        {Math.min(overview.settled, overview.needed)} of {overview.needed} posts with week-old results.
-      </p>
-      <p className="text-muted-foreground">
-        Patterns need several posts to compare. Log your posts and add results from a week or more after posting.
-      </p>
-      <div>
-        <Link href="/app/analytics" className="btn btn-secondary btn-sm w-full min-[480px]:w-auto">
+    <EmptyHero
+      title="Not enough results yet"
+      titleId="insights-ready"
+      action={
+        <Link href="/app/analytics" className="btn btn-secondary btn-sm">
           Go to Analytics
         </Link>
-      </div>
-    </section>
+      }
+    >
+      <p className="font-semibold text-foreground">
+        {Math.min(overview.settled, overview.needed)} of {overview.needed} posts with week-old results.
+      </p>
+      <p className="mt-2">
+        Patterns need several posts to compare. Log your posts and add results from a week or more after posting.
+      </p>
+    </EmptyHero>
   );
 }
 

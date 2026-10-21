@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { PageHeader } from "@/components/app-shell/page-header";
 import { ResearchContent } from "@/components/research/research-content";
 import { SectionSkeleton } from "@/components/settings/section-skeleton";
 
@@ -22,11 +23,12 @@ function ListSkeleton() {
 export default function ResearchPage() {
   return (
     <div className="stack-lg">
-      <div className="stack-sm max-w-3xl">
-        <h1>Research</h1>
-        <p className="lead">Real signals your ideas can be based on.</p>
-        <p className="field-help">Signals are inputs, not facts. We show where each one came from.</p>
-      </div>
+      <PageHeader
+        icon="research"
+        title="Research"
+        description="Real signals your ideas can be based on."
+        note="Signals are inputs, not facts. We show where each one came from."
+      />
       <Suspense fallback={<ListSkeleton />}>
         <ResearchContent />
       </Suspense>

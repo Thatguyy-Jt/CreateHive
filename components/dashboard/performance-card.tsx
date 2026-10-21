@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { connection } from "next/server";
+import { CardHeader } from "@/components/app-shell/card-header";
 import { formatCount } from "@/lib/analytics/format";
 import { logEvent } from "@/lib/observability/log";
 import { getPerformanceSummary } from "@/lib/services/analytics";
@@ -9,12 +10,17 @@ import { createUserClient } from "@/lib/supabase/server";
 import { ComparisonPill } from "../analytics/comparison";
 import { Sparkline } from "../charts/sparkline";
 
+/** Fewest posts the sparkline draws. */
+const SPARK_MIN_POINTS = 3;
+
 function Card({ children }: { children: ReactNode }) {
   return (
     <section className="card stack-sm" aria-labelledby="dashboard-performance">
-      <h2 id="dashboard-performance" className="text-heading">
-        Performance
-      </h2>
+      <CardHeader icon="chart">
+        <h2 id="dashboard-performance" className="text-heading">
+          Performance
+        </h2>
+      </CardHeader>
       {children}
     </section>
   );
@@ -70,20 +76,19 @@ export async function PerformanceCard() {
 
   const latest = summary.latestSettled;
   const views = latest?.comparison.metrics.find((m) => m.metric === "views");
-  const spark = summary.spark && summary.spark.points.length >= 2 ? summary.spark : null;
+  // Two points can't show a pattern, only a line between them.
+  const spark = summary.spark && summary.spark.points.length >= SPARK_MIN_POINTS ? summary.spark : null;
   return (
     <Card>
       {latest ? (
-        <div className="grid gap-1">
-          <p className="field-help">Latest post with settled results</p>
-          <p className="font-semibold break-words">
-            <Link href={`/app/analytics/${latest.id}`} className="link">
-              {latest.title}
-            </Link>
-          </p>
+        <div className="grid gap-2">
+          <p className="eyebrow">Latest settled post</p>
           {views?.value !== null && views?.value !== undefined ? (
-            <p className="text-3xl font-semibold leading-tight">
-              {formatCount(views.value, true)} <span className="text-base font-normal text-muted-foreground">views</span>
+            <p className="flex items-baseline gap-2">
+              <span className="text-[2rem] leading-[1.1] font-extrabold tracking-[-0.02em] tabular-nums">
+                {formatCount(views.value, true)}
+              </span>
+              <span className="text-muted-foreground">views</span>
             </p>
           ) : null}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -94,6 +99,11 @@ export async function PerformanceCard() {
               </span>
             ) : null}
           </div>
+          <p className="break-words">
+            <Link href={`/app/analytics/${latest.id}`} className="link">
+              {latest.title}
+            </Link>
+          </p>
         </div>
       ) : (
         <p className="text-muted-foreground">No settled results yet: results count once a post is a week old.</p>

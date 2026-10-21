@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PageHeader } from "@/components/app-shell/page-header";
 import { AccountSection } from "@/components/settings/account-section";
 import { AiUsageSection } from "@/components/settings/ai-usage-section";
 import { PrivacySection } from "@/components/settings/privacy-section";
@@ -11,10 +12,11 @@ export const metadata: Metadata = { title: "Settings" };
 export default function SettingsPage() {
   return (
     <div className="stack-lg max-w-2xl">
-      <div className="stack-sm">
-        <h1>Settings</h1>
-        <p className="lead">Your account, your timezone, your AI usage, and how your data is handled.</p>
-      </div>
+      <PageHeader
+        icon="settings"
+        title="Settings"
+        description="Your account, your timezone, your AI usage, and how your data is handled."
+      />
       <AccountSection />
       <TimezoneSection />
       <AiUsageSection />

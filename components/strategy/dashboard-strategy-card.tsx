@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { connection } from "next/server";
+import { CardHeader } from "@/components/app-shell/card-header";
 import { todayIn, weekStart } from "@/lib/calendar/dates";
 import { elapsedPlanWeek, PLAN_WEEKS } from "@/lib/calendar/plan-week";
 import { getTimezone } from "@/lib/services/calendar";
@@ -35,9 +36,11 @@ export async function DashboardStrategyCard() {
     if (onboarding.data.status !== "completed") return <FinishSetupCard headingId="dashboard-setup" />;
     return (
       <section className="card stack-sm" aria-labelledby="dashboard-strategy">
-        <h2 id="dashboard-strategy" className="text-heading">
-          Your strategy isn&apos;t built yet
-        </h2>
+        <CardHeader icon="strategy">
+          <h2 id="dashboard-strategy" className="text-heading">
+            Your strategy isn&apos;t built yet
+          </h2>
+        </CardHeader>
         <p className="text-muted-foreground">Your profile is saved. Build your strategy to get your first 30-day plan.</p>
         <div>
           <Link href="/app/strategy" className="btn btn-primary w-full sm:w-auto">
@@ -55,22 +58,42 @@ export async function DashboardStrategyCard() {
   const elapsed = thisWeek ? elapsedPlanWeek(strategy.updated_at, thisWeek, tz) : null;
   const week = elapsed !== null && elapsed <= PLAN_WEEKS ? strategy.thirty_day_plan[elapsed - 1] : null;
 
+  const finished = elapsed !== null && elapsed > PLAN_WEEKS;
   return (
-    <section className="card stack-sm" aria-labelledby="dashboard-strategy">
-      <p className="eyebrow">Your positioning</p>
-      <h2 id="dashboard-strategy" className="text-heading">
-        {strategy.positioning}
-      </h2>
-      {week ? (
-        <p>
-          <span className="font-semibold">Week {elapsed} focus:</span> {week.theme}. {week.focus}
-        </p>
-      ) : elapsed !== null && elapsed > PLAN_WEEKS ? (
-        <p>Your 30-day plan has finished. Rebuild your strategy for a fresh plan.</p>
-      ) : null}
+    <section className="card stack-md" aria-labelledby="dashboard-strategy">
+      <CardHeader icon="strategy">
+        <h2 id="dashboard-strategy" className="text-heading">
+          Your strategy
+        </h2>
+      </CardHeader>
+      {/* Positioning reads as a paragraph, with this week's focus beside it on wide screens. */}
+      <div className="grid gap-6 lg:grid-cols-[3fr_2fr] lg:gap-8">
+        <div className="grid content-start gap-2">
+          <p className="eyebrow">Your positioning</p>
+          <p className="max-w-[65ch] text-lg leading-[1.55] text-pretty break-words">{strategy.positioning}</p>
+        </div>
+        {week || finished ? (
+          <div className="grid content-start gap-2 border-t border-border pt-6 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-8">
+            {week ? (
+              <>
+                <p className="eyebrow">
+                  Week {elapsed} of {PLAN_WEEKS}
+                </p>
+                <p className="text-lg font-bold break-words">{week.theme}</p>
+                <p className="text-muted-foreground break-words">{week.focus}</p>
+              </>
+            ) : (
+              <>
+                <p className="eyebrow">30-day plan</p>
+                <p className="text-muted-foreground">Your 30-day plan has finished. Rebuild your strategy for a fresh plan.</p>
+              </>
+            )}
+          </div>
+        ) : null}
+      </div>
       <div>
         <Link href="/app/strategy" className="link-arrow">
-          {elapsed !== null && elapsed > PLAN_WEEKS ? "Rebuild your strategy" : "See your full strategy"}
+          {finished ? "Rebuild your strategy" : "See your full strategy"}
         </Link>
       </div>
     </section>
@@ -80,9 +103,11 @@ export async function DashboardStrategyCard() {
 function Unavailable() {
   return (
     <section className="card stack-sm" aria-labelledby="dashboard-strategy">
-      <h2 id="dashboard-strategy" className="text-heading">
-        Your strategy
-      </h2>
+      <CardHeader icon="strategy">
+        <h2 id="dashboard-strategy" className="text-heading">
+          Your strategy
+        </h2>
+      </CardHeader>
       <p className="text-muted-foreground">We couldn&apos;t load this right now. Refresh the page to try again.</p>
     </section>
   );

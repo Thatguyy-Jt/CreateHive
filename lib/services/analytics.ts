@@ -10,6 +10,7 @@ import {
   type PostComparison,
 } from "@/lib/analytics/baseline";
 import { chartPointsFor, SPARK_POST_LIMIT, type ChartPoint } from "@/lib/analytics/chart-data";
+import { platformOverview, type PlatformOverview } from "@/lib/analytics/overview";
 import { localDateKey, localTimeKey, localToInstant, todayIn } from "@/lib/calendar/dates";
 import { logEvent } from "@/lib/observability/log";
 import {
@@ -481,8 +482,8 @@ export interface AnalyticsOverview {
   truncated: boolean;
   needsResults: PostSummary[];
   platforms: PlatformSummary[];
-  /** Views per post for each platform in `platforms`, same order. */
-  charts: { platform: Platform | null; points: ChartPoint[] }[];
+  /** The overview (KPIs, series, top posts, formats, mix) for each platform in `platforms`, same order. */
+  overviews: PlatformOverview[];
 }
 
 /** Everything /app/analytics shows. Never throws. */
@@ -503,10 +504,7 @@ export async function getAnalyticsOverview(
         truncated: posts.length > POST_LIST_LIMIT,
         needsResults: needsResults(posts, now).slice(0, NEEDS_RESULTS_LIMIT),
         platforms: summaries,
-        charts: summaries.map((summary) => ({
-          platform: summary.platform,
-          points: chartPointsFor(posts, summary.platform),
-        })),
+        overviews: summaries.map((summary) => platformOverview(posts, summary.platform)),
       },
     };
   } catch (error) {

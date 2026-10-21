@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Suspense } from "react";
+import { PageHeader } from "@/components/app-shell/page-header";
 import { SectionSkeleton } from "@/components/settings/section-skeleton";
 import { StudioItemContent } from "@/components/studio/studio-item-content";
 
@@ -26,14 +26,7 @@ function ItemSkeleton() {
 export default function StudioItemPage({ params, searchParams }: PageProps<"/app/studio/[id]">) {
   return (
     <div className="stack-lg max-w-3xl">
-      <div className="stack-sm">
-        <p>
-          <Link href="/app/studio" className="link">
-            <span aria-hidden="true">←</span> All Studio items
-          </Link>
-        </p>
-        <h1>Content package</h1>
-      </div>
+      <PageHeader icon="studio" title="Content package" back={{ href: "/app/studio", label: "All Studio items" }} />
       <Suspense fallback={<ItemSkeleton />}>
         <StudioItemContent params={params} searchParams={searchParams} />
       </Suspense>

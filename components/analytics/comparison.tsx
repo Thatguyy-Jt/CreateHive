@@ -14,7 +14,9 @@ export const platformName = (platform: Platform | null) => (platform ? PLATFORM_
 /** "↑ Above your usual" as text; the arrow is decorative. */
 export function ComparisonPill({ label }: { label: ComparisonLabel }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-pill border border-border px-3 py-0.5 text-sm font-semibold whitespace-nowrap">
+    <span
+      className={`pill-${label} inline-flex items-center gap-1 rounded-pill border px-3 py-0.5 text-sm font-semibold whitespace-nowrap`}
+    >
       <span aria-hidden="true">{LABEL_ARROWS[label]}</span>
       {COMPARISON_TEXT[label]}
     </span>

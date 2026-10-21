@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
+import { PageHeader } from "@/components/app-shell/page-header";
 import { OpportunitiesContent } from "@/components/opportunities/opportunities-content";
 import { SectionSkeleton } from "@/components/settings/section-skeleton";
 
@@ -9,7 +10,7 @@ export const metadata: Metadata = { title: "Opportunities" };
 function ListSkeleton() {
   return (
     <div className="stack-md max-w-3xl" aria-hidden="true">
-      <div className="h-11 w-64 max-w-full rounded-pill bg-surface-muted" />
+      <div className="skeleton h-11 w-64 max-w-full rounded-pill" />
       {[0, 1, 2].map((index) => (
         <div key={index} className="card">
           <SectionSkeleton lines={3} />
@@ -24,17 +25,21 @@ function ListSkeleton() {
 export default function OpportunitiesPage({ searchParams }: PageProps<"/app/opportunities">) {
   return (
     <div className="stack-lg">
-      <div className="stack-sm max-w-3xl">
-        <h1>Opportunities</h1>
-        <p className="lead">Ideas that fit your strategy. Save the ones you&apos;ll make.</p>
-        <p className="field-help">
-          Ideas are based on your profile, your strategy, the{" "}
-          <Link href="/app/research" className="link">
-            research signals
-          </Link>{" "}
-          you add and (once connected) your performance. Signals are inputs, not facts: each idea shows what it cites.
-        </p>
-      </div>
+      <PageHeader
+        icon="opportunities"
+        title="Opportunities"
+        description="Ideas that fit your strategy. Save the ones you’ll make."
+        note={
+          <>
+            Ideas are based on your profile, your strategy, the{" "}
+            <Link href="/app/research" className="link">
+              research signals
+            </Link>{" "}
+            you add and (once connected) your performance. Signals are inputs, not facts: each idea shows what it
+            cites.
+          </>
+        }
+      />
       <Suspense fallback={<ListSkeleton />}>
         <OpportunitiesContent searchParams={searchParams} />
       </Suspense>

@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { connection } from "next/server";
+import { CardHeader } from "@/components/app-shell/card-header";
 import { logEvent } from "@/lib/observability/log";
 import { CONFIDENCE_LABELS } from "@/lib/schemas/insights";
 import { getInsightsOverview } from "@/lib/services/insights";
@@ -13,9 +14,11 @@ const TOP_INSIGHTS = 2;
 function Card({ children }: { children: ReactNode }) {
   return (
     <section className="card stack-sm" aria-labelledby="dashboard-learned">
-      <h2 id="dashboard-learned" className="text-heading">
-        What AI learned
-      </h2>
+      <CardHeader icon="sparkle">
+        <h2 id="dashboard-learned" className="text-heading">
+          What AI learned
+        </h2>
+      </CardHeader>
       {children}
     </section>
   );
@@ -78,12 +81,25 @@ export async function LearnedCard() {
     );
   }
   if (overview.settled < overview.needed) {
+    const done = Math.min(overview.settled, overview.needed);
     return (
       <Card>
-        <p className="text-muted-foreground">
-          Patterns from your results appear once {overview.needed} posts have week-old results (
-          {Math.min(overview.settled, overview.needed)} of {overview.needed} so far).
-        </p>
+        <div className="grid gap-2">
+          <p id="dashboard-learned-progress" className="font-bold">
+            {done} of {overview.needed} posts with week-old results
+          </p>
+          <div
+            role="meter"
+            aria-labelledby="dashboard-learned-progress"
+            aria-valuemin={0}
+            aria-valuemax={overview.needed}
+            aria-valuenow={done}
+            className="meter"
+          >
+            <div className="meter-fill" style={{ width: `${(done / overview.needed) * 100}%` }} />
+          </div>
+        </div>
+        <p className="text-muted-foreground">Patterns appear once {overview.needed} posts have week-old results.</p>
         {action("/app/analytics", "Add results")}
       </Card>
     );

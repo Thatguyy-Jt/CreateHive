@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { PageHeader } from "@/components/app-shell/page-header";
 import { SectionSkeleton } from "@/components/settings/section-skeleton";
 import { StudioListContent } from "@/components/studio/studio-list-content";
 
@@ -22,11 +23,12 @@ function ListSkeleton() {
 export default function StudioPage() {
   return (
     <div className="stack-lg">
-      <div className="stack-sm max-w-3xl">
-        <h1>Studio</h1>
-        <p className="lead">Turn the ideas you chose into scripts, shot lists and captions in your voice.</p>
-        <p className="field-help">Studio prepares your content. It doesn&apos;t post for you.</p>
-      </div>
+      <PageHeader
+        icon="studio"
+        title="Studio"
+        description="Turn the ideas you chose into scripts, shot lists and captions in your voice."
+        note="Studio prepares your content. It doesn’t post for you."
+      />
       <Suspense fallback={<ListSkeleton />}>
         <StudioListContent />
       </Suspense>

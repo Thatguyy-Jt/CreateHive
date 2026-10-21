@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { PageHeader } from "@/components/app-shell/page-header";
 import { InsightsContent } from "@/components/insights/insights-content";
 import { SectionSkeleton } from "@/components/settings/section-skeleton";
 
@@ -22,13 +23,12 @@ function InsightsSkeleton() {
 export default function InsightsPage() {
   return (
     <div className="stack-lg max-w-3xl">
-      <div className="stack-sm">
-        <h1>Insights</h1>
-        <p className="lead">Patterns from your own results: what seems to work for you, and what to try next.</p>
-        <p className="field-help">
-          Based only on the numbers you&apos;ve entered. Insights get more reliable as you add results.
-        </p>
-      </div>
+      <PageHeader
+        icon="insights"
+        title="Insights"
+        description="Patterns from your own results: what seems to work for you, and what to try next."
+        note="Based only on the numbers you’ve entered. Insights get more reliable as you add results."
+      />
       <Suspense fallback={<InsightsSkeleton />}>
         <InsightsContent />
       </Suspense>

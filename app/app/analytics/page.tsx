@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { PageHeader } from "@/components/app-shell/page-header";
 import { AnalyticsContent } from "@/components/analytics/analytics-content";
 import { SectionSkeleton } from "@/components/settings/section-skeleton";
 
@@ -19,18 +20,17 @@ function AnalyticsSkeleton() {
 
 // The heading is static; the session-bound content sits behind Suspense and
 // calls `auth.protect()` itself.
-export default function AnalyticsPage() {
+export default function AnalyticsPage({ searchParams }: PageProps<"/app/analytics">) {
   return (
-    <div className="stack-lg max-w-3xl">
-      <div className="stack-sm">
-        <h1>Analytics</h1>
-        <p className="lead">Log what you posted and see how each post compares with your own usual numbers.</p>
-        <p className="field-help">
-          We don&apos;t connect to your accounts yet: you enter the numbers from each platform&apos;s insights.
-        </p>
-      </div>
+    <div className="stack-lg">
+      <PageHeader
+        icon="analytics"
+        title="Analytics"
+        description="Log what you posted and see how each post compares with your own usual numbers."
+        note="We don’t connect to your accounts yet: you enter the numbers from each platform’s insights."
+      />
       <Suspense fallback={<AnalyticsSkeleton />}>
-        <AnalyticsContent />
+        <AnalyticsContent searchParams={searchParams} />
       </Suspense>
     </div>
   );

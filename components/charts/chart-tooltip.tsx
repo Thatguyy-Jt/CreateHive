@@ -41,11 +41,11 @@ export function ChartTooltip({
  * Key for the reference line, above the plot: a line key and the value. Kept
  * out of the plot so it never collides with columns or the data line.
  */
-export function UsualKey({ usual }: { usual: number }) {
+export function UsualKey({ usual, display }: { usual: number; /** Pre-formatted value; views by default. */ display?: string }) {
   return (
     <p className="mb-1 flex items-center justify-end gap-2 text-sm text-muted-foreground">
       <span aria-hidden="true" className="inline-block h-[1.5px] w-4 bg-foreground" />
-      Your usual · <span className="font-semibold text-foreground">{formatCount(usual, true)}</span>
+      Your usual · <span className="font-semibold text-foreground">{display ?? formatCount(usual, true)}</span>
     </p>
   );
 }

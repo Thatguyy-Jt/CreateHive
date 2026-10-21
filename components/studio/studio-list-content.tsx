@@ -7,6 +7,7 @@ import { PLATFORM_LABELS } from "@/lib/schemas/creator";
 import { getTimezone } from "@/lib/services/calendar";
 import { listStudioItems, type StudioListItem } from "@/lib/services/studio";
 import { createUserClient } from "@/lib/supabase/server";
+import { EmptyHero } from "../app-shell/empty-hero";
 import { LoadError } from "./load-error";
 
 /** "Wed, Oct 14, 9:00 AM" in the creator's timezone, or null without one. */
@@ -65,17 +66,19 @@ export async function StudioListContent() {
 
   if (list.items.length === 0) {
     return (
-      <section className="card max-w-3xl stack-sm" aria-labelledby="studio-empty">
-        <h2 id="studio-empty" className="text-heading">
-          Nothing in Studio yet
-        </h2>
-        <p className="text-muted-foreground">Pick a saved idea to start.</p>
-        <div>
-          <Link href="/app/opportunities?view=saved" className="btn btn-primary w-full min-[480px]:w-auto">
-            Go to saved ideas
-          </Link>
-        </div>
-      </section>
+      <div className="max-w-3xl">
+        <EmptyHero
+          title="Nothing in Studio yet"
+          titleId="studio-empty"
+          action={
+            <Link href="/app/opportunities?view=saved" className="btn btn-primary">
+              Go to saved ideas
+            </Link>
+          }
+        >
+          <p>Pick a saved idea to start.</p>
+        </EmptyHero>
+      </div>
     );
   }
 

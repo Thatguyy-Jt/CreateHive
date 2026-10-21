@@ -1,7 +1,7 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import { Analytics } from "@vercel/analytics/next";
 import type { Metadata } from "next";
-import { Geist_Mono, Instrument_Serif, Manrope } from "next/font/google";
+import { Geist_Mono, Instrument_Serif, Manrope, Nunito_Sans } from "next/font/google";
 import "./globals.css";
 
 // Maps Clerk's components onto the design-system tokens. The values are CSS
@@ -21,7 +21,8 @@ const clerkAppearance = {
     colorBorder: "var(--border)",
     colorRing: "var(--ring)",
     colorDanger: "var(--danger)",
-    fontFamily: "var(--font-manrope), ui-sans-serif, system-ui, sans-serif",
+    // The logged-in app sets --font-app (Nunito Sans); auth pages fall back to Manrope.
+    fontFamily: "var(--font-app, var(--font-manrope)), ui-sans-serif, system-ui, sans-serif",
     borderRadius: "0.75rem",
   },
 };
@@ -29,6 +30,14 @@ const clerkAppearance = {
 const manrope = Manrope({
   variable: "--font-manrope",
   subsets: ["latin"],
+});
+
+// The logged-in app's single family (globals.css section 11). Only the three
+// weights the app uses are loaded, so 500/600 resolve to 400/700.
+const nunitoSans = Nunito_Sans({
+  variable: "--font-nunito-sans",
+  subsets: ["latin"],
+  weight: ["400", "700", "800"],
 });
 
 const instrumentSerif = Instrument_Serif({
@@ -56,7 +65,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${manrope.variable} ${instrumentSerif.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${manrope.variable} ${nunitoSans.variable} ${instrumentSerif.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <ClerkProvider

@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { connection } from "next/server";
 import type { ReactNode } from "react";
+import { CardHeader } from "@/components/app-shell/card-header";
 import { ScheduleIdeaForm } from "@/components/calendar/schedule-idea-form";
 import { addDays, formatLongDay, formatTime } from "@/lib/calendar/dates";
 import { logEvent } from "@/lib/observability/log";
@@ -50,13 +51,13 @@ export async function DashboardToday() {
 function TodayFrame({ today, children }: { today: string | null; children: ReactNode }) {
   const label = today ? formatLongDay(today) : null;
   return (
-    <section className="card card-offset stack-sm" aria-labelledby={HEADING_ID}>
-      <div>
+    <section className="card card-hero stack-sm" aria-labelledby={HEADING_ID}>
+      <CardHeader icon="target">
         <h2 id={HEADING_ID} className="text-heading">
           What should I do today?
         </h2>
         {label ? <p className="field-help">{label}</p> : null}
-      </div>
+      </CardHeader>
       {children}
     </section>
   );
@@ -202,10 +203,12 @@ function TodayCard({ today, recommendation }: { today: string | null; recommenda
 
 function TodayError() {
   return (
-    <section className="card card-offset stack-sm" aria-labelledby={HEADING_ID}>
-      <h2 id={HEADING_ID} className="text-heading">
-        What should I do today?
-      </h2>
+    <section className="card card-hero stack-sm" aria-labelledby={HEADING_ID}>
+      <CardHeader icon="target">
+        <h2 id={HEADING_ID} className="text-heading">
+          What should I do today?
+        </h2>
+      </CardHeader>
       <p className="text-muted-foreground">We couldn&apos;t load today&apos;s plan. Refresh the page to try again.</p>
     </section>
   );

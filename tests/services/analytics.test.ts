@@ -332,9 +332,11 @@ describe("getAnalyticsOverview", () => {
       { platform: "youtube", posts: 6, settled: 4, usualViews: 1100, usualEngagementRate: null },
     ]);
     expect(overview.truncated).toBe(false);
-    // One chart per platform: posts with views, oldest first.
-    expect(overview.charts).toHaveLength(1);
-    expect(overview.charts[0].points.map((p) => [p.id, p.views, p.settled])).toEqual([
+    // One overview per platform; its views series is posts with views, oldest first.
+    expect(overview.overviews).toHaveLength(1);
+    expect(overview.overviews[0].platform).toBe("youtube");
+    expect(overview.overviews[0].kpis.find((k) => k.metric === "views")!.usual).toBe(1100);
+    expect(overview.overviews[0].series.views.map((p) => [p.id, p.value, p.settled])).toEqual([
       ["d", 1200, true],
       ["c", 800, true],
       ["b", 1000, true],

@@ -1,21 +1,26 @@
 import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { connection } from "next/server";
-import { COMPARISON_TEXT, MIN_BASELINE_POSTS, type PlatformSummary } from "@/lib/analytics/baseline";
-import { CHART_POST_LIMIT, type ChartPoint } from "@/lib/analytics/chart-data";
-import { formatCount, formatPercent } from "@/lib/analytics/format";
+import { METRICS, MIN_BASELINE_POSTS, type Metric } from "@/lib/analytics/baseline";
+import { formatCount } from "@/lib/analytics/format";
+import { pickPlatform, platformParam, type PlatformOverview } from "@/lib/analytics/overview";
 import { formatDay, localDateKey, todayIn } from "@/lib/calendar/dates";
 import { logEvent } from "@/lib/observability/log";
 import { postDateRange } from "@/lib/schemas/analytics";
-import { PLATFORM_LABELS } from "@/lib/schemas/creator";
+import { PLATFORM_LABELS, type Platform } from "@/lib/schemas/creator";
 import { getAnalyticsOverview, POST_LIST_LIMIT, type PostListEntry, type PostSummary } from "@/lib/services/analytics";
 import { getTimezone } from "@/lib/services/calendar";
 import { createUserClient } from "@/lib/supabase/server";
-import { ColumnChart, type DrawnColumn } from "../charts/column-chart";
+import { EmptyHero } from "../app-shell/empty-hero";
+import type { DrawnColumn } from "../charts/column-chart";
+import { ComparisonDonut } from "../charts/comparison-donut";
+import { FormatBars } from "../charts/format-bars";
 import { StatTile } from "../charts/stat-tile";
-import { ComparisonPill, platformName } from "./comparison";
+import { ComparisonPill } from "./comparison";
 import { LoadError } from "./load-error";
+import { MetricOverview } from "./metric-overview";
 import { PastPostForm } from "./past-post-form";
+import { TopPosts } from "./top-posts";
 
 /** "Wed, Oct 14" in the creator's zone, or null without one. */
 export function postDay(instant: string, tz: string | null): string | null {
@@ -26,112 +31,90 @@ export function postDay(instant: string, tz: string | null): string | null {
 const metaLine = (post: Pick<PostSummary, "platform" | "format">) =>
   [post.platform ? PLATFORM_LABELS[post.platform] : null, post.format].filter(Boolean).join(" · ");
 
-const VIEWS_HELP = "Needs 3 posts with settled results";
+const platformLabel = (platform: Platform | null) => (platform ? PLATFORM_LABELS[platform] : "No platform");
 
-function PlatformCard({
-  summary,
-  points,
-  tz,
-}: {
-  summary: PlatformSummary;
-  points: ChartPoint[];
-  tz: string | null;
-}) {
-  const name = summary.platform ? PLATFORM_LABELS[summary.platform] : "No platform";
-  const headingId = `platform-${summary.platform ?? "none"}`;
-  const ready = summary.usualViews !== null || summary.usualEngagementRate !== null;
-  const drawn: DrawnColumn[] = points.map((point) => ({ ...point, dateLabel: postDay(point.published_at, tz) }));
-  const both = drawn.some((p) => p.settled) && drawn.some((p) => !p.settled);
-  const usual = summary.usualViews;
+/** One link per platform with posts; the selected one is the current page. */
+function PlatformSwitcher({ platforms, selected }: { platforms: (Platform | null)[]; selected: Platform | null }) {
   return (
-    <li className="card stack-md" aria-labelledby={headingId}>
-      <h3 id={headingId} className="text-lg font-bold">
-        {name}
-      </h3>
-      <div className="@container">
-        <div className="grid gap-3 @[34rem]:grid-cols-3">
-        <StatTile
-          label="Posts"
-          value={formatCount(summary.posts)}
-          note={`${summary.settled} with settled results`}
-        />
-        <StatTile
-          label="Usual views"
-          value={usual !== null ? formatCount(Math.round(usual), true) : "—"}
-          note={usual !== null ? "Middle of your settled posts" : VIEWS_HELP}
-        />
-        <StatTile
-          label="Usual engagement"
-          value={summary.usualEngagementRate !== null ? formatPercent(summary.usualEngagementRate) : "—"}
-          note={summary.usualEngagementRate !== null ? "Likes, comments, shares, saves per view" : VIEWS_HELP}
-        />
-        </div>
-      </div>
-      {ready ? null : (
-        <p className="text-muted-foreground">
-          Not enough posts yet: {Math.min(summary.settled, MIN_BASELINE_POSTS)} of {MIN_BASELINE_POSTS} with settled results
-          on {platformName(summary.platform)}. Log a past post to compare sooner.
-        </p>
-      )}
-      {drawn.length >= 2 ? (
-        <figure className="stack-sm">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <figcaption className="text-sm font-semibold">
-              Views per post{drawn.length === CHART_POST_LIMIT ? ` (last ${CHART_POST_LIMIT})` : ""}
-            </figcaption>
-            {both ? (
-              <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground" aria-label="Legend">
-                <li className="flex items-center gap-2">
-                  <span aria-hidden="true" className="inline-block h-3 w-3 rounded-[3px] bg-[var(--chart-accent)]" />
-                  Settled
-                </li>
-                <li className="flex items-center gap-2">
-                  <span aria-hidden="true" className="inline-block h-3 w-3 rounded-[3px] bg-[var(--chart-muted)]" />
-                  Early (first week)
-                </li>
-              </ul>
-            ) : null}
+    <nav aria-label="Platform">
+      <ul className="flex flex-wrap gap-2">
+        {platforms.map((platform) => {
+          const current = platform === selected;
+          return (
+            <li key={platformParam(platform)}>
+              <Link
+                href={`/app/analytics?platform=${platformParam(platform)}`}
+                aria-current={current ? "page" : undefined}
+                scroll={false}
+                className={`inline-flex min-h-11 items-center whitespace-nowrap rounded-pill border px-4 text-sm font-bold ${
+                  current ? "" : "border-border hover:border-muted-foreground"
+                }`}
+              >
+                {platformLabel(platform)}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
+
+/** The selected platform: KPI tabs and chart, then top posts, views by format and the comparison mix. */
+function PlatformOverviewSection({ overview, tz }: { overview: PlatformOverview; tz: string | null }) {
+  const name = platformLabel(overview.platform);
+  const series = Object.fromEntries(
+    METRICS.map((metric) => [
+      metric,
+      overview.series[metric].map((point): DrawnColumn => ({ ...point, dateLabel: postDay(point.published_at, tz) })),
+    ]),
+  ) as Record<Metric, DrawnColumn[]>;
+  const dayOf = Object.fromEntries(overview.topPosts.map((post) => [post.id, postDay(post.published_at, tz)]));
+  const compared = overview.mix.above + overview.mix.around + overview.mix.below;
+  const onlyFormat = overview.formats.length === 1 ? overview.formats[0] : null;
+
+  return (
+    <>
+      <MetricOverview platformName={name} kpis={overview.kpis} series={series} />
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <TopPosts posts={overview.topPosts} dayOf={dayOf} />
+        <section className="card stack-md" aria-labelledby="analytics-formats">
+          <div>
+            <h2 id="analytics-formats" className="text-heading">
+              Views by format
+            </h2>
+            <p className="field-help">Median views of settled posts</p>
           </div>
-          <ColumnChart
-            points={drawn}
-            usual={usual}
-            label={`Views per post on ${name}, oldest to newest: ${drawn.length} posts from ${formatCount(Math.min(...drawn.map((p) => p.views)))} to ${formatCount(Math.max(...drawn.map((p) => p.views)))} views${usual !== null ? `; your usual is ${formatCount(Math.round(usual))}` : ""}. Each column links to its post.`}
-          />
-          <details className="stack-sm">
-            <summary className="min-h-11 cursor-pointer content-center text-sm font-semibold">Show as table</summary>
-            <table className="w-full text-left text-sm">
-              <caption className="sr-only">Views per post on {name}</caption>
-              <thead>
-                <tr className="border-b border-border">
-                  <th scope="col" className="py-2 pr-3 font-semibold">Post</th>
-                  <th scope="col" className="py-2 pr-3 font-semibold">Posted</th>
-                  <th scope="col" className="py-2 pr-3 text-right font-semibold">Views</th>
-                  <th scope="col" className="hidden py-2 font-semibold min-[480px]:table-cell">Compared</th>
-                </tr>
-              </thead>
-              <tbody>
-                {drawn.toReversed().map((point) => (
-                  <tr key={point.id} className="border-b border-border last:border-0">
-                    <th scope="row" className="py-2 pr-3 font-normal break-words">
-                      <Link href={`/app/analytics/${point.id}`} className="link">
-                        {point.title}
-                      </Link>
-                    </th>
-                    <td className="py-2 pr-3 whitespace-nowrap">{point.dateLabel ?? "—"}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums">{formatCount(point.views)}</td>
-                    <td className="hidden py-2 min-[480px]:table-cell">
-                      {point.label ? COMPARISON_TEXT[point.label] : point.settled ? "Not compared" : "Early results"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </details>
-        </figure>
-      ) : (
-        <p className="field-help">Add results to 2 or more posts to see a chart.</p>
-      )}
-    </li>
+          {overview.formats.length > 1 ? (
+            <FormatBars formats={overview.formats} />
+          ) : onlyFormat ? (
+            <StatTile
+              label={onlyFormat.format}
+              value={formatCount(Math.round(onlyFormat.medianViews), true)}
+              note={`Median of ${onlyFormat.posts} ${onlyFormat.posts === 1 ? "post" : "posts"}. Try another format to compare.`}
+            />
+          ) : (
+            <p className="text-muted-foreground">Views by format appear once posts have week-old results.</p>
+          )}
+        </section>
+        <section className="card stack-md md:col-span-2 lg:col-span-1" aria-labelledby="analytics-mix">
+          <div>
+            <h2 id="analytics-mix" className="text-heading">
+              How your posts compare
+            </h2>
+            <p className="field-help">Settled posts, views vs your usual</p>
+          </div>
+          {compared >= MIN_BASELINE_POSTS ? (
+            <ComparisonDonut mix={overview.mix} />
+          ) : (
+            <p className="text-muted-foreground">
+              Not enough compared posts yet ({compared} of {MIN_BASELINE_POSTS}). A post is compared once{" "}
+              {MIN_BASELINE_POSTS} others on {name} have week-old results.
+            </p>
+          )}
+        </section>
+      </div>
+    </>
   );
 }
 
@@ -197,7 +180,8 @@ function PostRow({ post, tz }: { post: PostListEntry; tz: string | null }) {
 }
 
 /** Session-bound part of /app/analytics: summaries, posts needing results, the post list and the past-post form. */
-export async function AnalyticsContent() {
+/** Session-bound part of /app/analytics: the platform overview, posts needing results, the post list and the past-post form. */
+export async function AnalyticsContent({ searchParams }: { searchParams: Promise<{ platform?: string | string[] }> }) {
   // "Needs results" and dates depend on the current time: never prerender.
   await connection();
   const { userId } = await auth.protect();
@@ -210,10 +194,11 @@ export async function AnalyticsContent() {
     return <LoadError />;
   }
 
-  const [result, timezone, profile] = await Promise.all([
+  const [result, timezone, profile, params] = await Promise.all([
     getAnalyticsOverview(client, userId),
     getTimezone(client, userId),
     client.from("creator_profiles").select("platforms").eq("user_id", userId).maybeSingle(),
+    searchParams,
   ]);
   if (!result.ok) return <LoadError />;
   const { overview } = result;
@@ -222,34 +207,38 @@ export async function AnalyticsContent() {
   const firstPlatform = profile.data?.platforms?.[0] ?? null;
   const empty = overview.posts.length === 0;
 
+  // Validated against the creator's own platforms; never used in a query.
+  const platforms = overview.overviews.map((o) => o.platform);
+  const selected = pickPlatform(params.platform, platforms);
+  const current = selected === undefined ? null : (overview.overviews.find((o) => o.platform === selected) ?? null);
+
   return (
     <div className="stack-lg">
       {empty ? (
-        <section className="card stack-sm" aria-labelledby="analytics-empty">
-          <h2 id="analytics-empty" className="text-heading">
-            No posts yet
-          </h2>
-          <p className="text-muted-foreground">
-            Mark a Studio item as published, or log a post you already made, to start your baseline.
-          </p>
-        </section>
+        <EmptyHero
+          title="No posts yet"
+          titleId="analytics-empty"
+          action={
+            <a href="#log-past-post" className="btn btn-primary">
+              Log a past post
+            </a>
+          }
+        >
+          <p>Mark a Studio item as published, or log a post you already made, to start your baseline.</p>
+        </EmptyHero>
       ) : (
         <>
-          <section className="stack-sm" aria-labelledby="analytics-platforms">
-            <h2 id="analytics-platforms" className="text-heading">
-              Your usual numbers
-            </h2>
-            <ul className="stack-md">
-              {overview.platforms.map((summary, index) => (
-                <PlatformCard
-                  key={summary.platform ?? "none"}
-                  summary={summary}
-                  points={overview.charts[index]?.points ?? []}
-                  tz={tz}
-                />
-              ))}
-            </ul>
-          </section>
+          {current ? (
+            <section className="stack-md" aria-labelledby="analytics-overview">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 id="analytics-overview" className="text-heading">
+                  Overview{platforms.length > 1 ? null : ` · ${platformLabel(current.platform)}`}
+                </h2>
+                {platforms.length > 1 ? <PlatformSwitcher platforms={platforms} selected={current.platform} /> : null}
+              </div>
+              <PlatformOverviewSection key={platformParam(current.platform)} overview={current} tz={tz} />
+            </section>
+          ) : null}
           {overview.needsResults.length ? <NeedsResults posts={overview.needsResults} tz={tz} /> : null}
           <section className="stack-sm" aria-labelledby="analytics-posts">
             <h2 id="analytics-posts" className="text-heading">
@@ -267,7 +256,7 @@ export async function AnalyticsContent() {
         </>
       )}
 
-      <details className="card stack-sm" open={empty ? true : undefined}>
+      <details id="log-past-post" className="card stack-sm scroll-mt-24" open={empty ? true : undefined}>
         <summary className="min-h-11 cursor-pointer content-center text-heading">Log a past post</summary>
         <div className="stack-sm pt-2">
           <p className="field-help">

@@ -968,3 +968,1100 @@
     transform: rotate(45deg);
   }
 }
+
+/* ==========================================================================
+   11. APP SHELL
+   The logged-in app (`.app-shell`) and onboarding (`.app-canvas`) follow a
+   monochrome "signage" system: ink on white, surfaces defined by 1px borders
+   and two radii (6px controls, 16px cards), one shadow (the top bar and
+   floating UI), and a single green kept for actions and selected states.
+   The app is always light, so the tokens are pinned on <body> for both colour
+   schemes: that also covers UI portaled to <body> (Clerk's user menu,
+   toasts). Marketing and auth pages keep sections 1–10.
+   ========================================================================== */
+
+:root {
+  /* Motion: strong ease-out for entering UI, ease-in-out for on-screen movement */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+body:has(.app-shell, .app-canvas) {
+  color-scheme: light;
+
+  /* Palette */
+  --ink: #040404;
+  --slate: #162020;
+  --pewter: #6e797a;
+  --ash: #d9d9d9;
+  --smoke: #cbcece;
+  --fog: #f3f4f4; /* faint fill: skeletons, hovers */
+  --sprout: #98e58e;
+  --sprout-hover: #86d97b;
+  /* Soft prism wash: the stage for the empty-state panel and the Today card */
+  --wash-1: rgb(152 229 142);
+  --wash-2: rgb(120 214 206);
+  --wash-3: rgb(150 160 240);
+  --prism-wash: linear-gradient(
+    135deg,
+    rgb(152 229 142 / 0.18) 0%,
+    rgb(120 214 206 / 0.14) 45%,
+    rgb(150 160 240 / 0.14) 100%
+  );
+  /* The same hues at full strength, for bars (an ink hairline keeps their edges) */
+  --bar-wash: linear-gradient(0deg, var(--wash-1) 0%, var(--wash-2) 50%, var(--wash-3) 100%);
+  --bar-wash-x: linear-gradient(90deg, var(--wash-1) 0%, var(--wash-2) 50%, var(--wash-3) 100%);
+  --bar-edge: rgb(4 4 4 / 0.28);
+
+  /* Semantic */
+  --canvas: #ffffff;
+  --background: #ffffff;
+  --surface: #ffffff;
+  --surface-muted: var(--fog);
+  --muted: var(--fog);
+  --foreground: var(--ink);
+  --foreground-2: var(--slate);
+  --muted-foreground: var(--pewter);
+  --border: var(--ash);
+  --border-strong: var(--smoke);
+  --card-edge: var(--ash);
+  --primary: var(--sprout);
+  --primary-foreground: var(--ink);
+  --primary-hover: var(--sprout-hover);
+  --primary-hover-foreground: var(--ink);
+  /* Accent is ink in the app: decoration stays monochrome, green means "action". */
+  --accent: var(--ink);
+  --accent-foreground: #ffffff;
+  --ring: var(--ink);
+  --success: #1f7a3d;
+  --warning: #9a5b00;
+  --danger: #c2410c;
+  --chart-accent: var(--ink);
+  --chart-muted: #8a9393; /* ≥ 3:1 on white */
+  /* Above / around / below: diverging, two hues and a neutral midpoint (validated) */
+  --compare-above: #1f7a3d;
+  --compare-around: #8a9393;
+  --compare-below: #c2410c;
+  --nav-shadow: rgba(39, 51, 51, 0.24) 0 4px 8px 0;
+  --card-shadow: none;
+  --shadow-float: var(--nav-shadow);
+
+  /* Shape: two radii plus pills */
+  --radius-control: 6px;
+  --radius-card: 16px;
+  --radius-sm: var(--radius-control);
+  --radius-md: var(--radius-card);
+  --radius-lg: var(--radius-card);
+
+  /* Type: one family, 400 / 700 / 800 only */
+  --font-app: var(--font-nunito-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-app);
+  --font-weight-medium: 400;
+  --font-weight-semibold: 700;
+
+  --text-display-lg: clamp(1.75rem, 1.5rem + 1vw, 2rem); /* page title, 28→32px */
+  --text-display-lg--line-height: 1.18;
+  --text-display-lg--letter-spacing: -0.02em;
+  --text-display-md: 1.3125rem; /* 21px */
+  --text-display-md--line-height: 1.33;
+  --text-display-md--letter-spacing: -0.01em;
+  --text-heading: 1.3125rem;
+  --text-heading--line-height: 1.33;
+  --text-heading--letter-spacing: -0.01em;
+  --text-lead: 1rem;
+  --text-lead--line-height: 1.6;
+
+  background-color: var(--canvas);
+  color: var(--foreground);
+  font-family: var(--font-app);
+}
+
+body:has(.app-shell, .app-canvas) ::selection {
+  background: var(--sprout);
+  color: var(--ink);
+}
+
+@layer components {
+  .app-shell,
+  .app-canvas {
+    font-size: 1rem; /* rem: honours the user's text size */
+    line-height: 1.6;
+    background-color: var(--canvas);
+  }
+
+  .app-canvas {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+  }
+
+  .app-shell {
+    display: flex;
+    flex: 1;
+    min-height: 100dvh;
+  }
+
+  /* ---- Type ---- */
+
+  .app-shell h1,
+  .app-canvas h1 {
+    font-weight: 800;
+  }
+
+  .app-shell h3,
+  .app-canvas h3 {
+    font-size: 1.125rem;
+    line-height: 1.4;
+    letter-spacing: 0;
+  }
+
+  .app-shell .field-help,
+  .app-canvas .field-help {
+    font-size: 0.8125rem;
+    line-height: 1.48;
+  }
+
+  .app-shell :is(.eyebrow, .field-label, .field-error),
+  .app-canvas :is(.eyebrow, .field-label, .field-error) {
+    font-weight: 700;
+  }
+
+  .app-shell .eyebrow,
+  .app-canvas .eyebrow {
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+  }
+
+  /* Links: ink with a permanent underline. The underline is the affordance. */
+  .app-shell .link,
+  .app-canvas .link {
+    font-weight: 400;
+    text-decoration-color: currentColor;
+  }
+
+  /* ---- Sidebar: white, border-defined ---- */
+
+  .app-sidebar {
+    position: sticky;
+    top: 0;
+    flex-direction: column;
+    gap: 1.5rem;
+    width: 15rem;
+    height: 100dvh;
+    flex-shrink: 0;
+    padding: 0 0.75rem 1rem;
+    border-right: 1px solid var(--border);
+    background-color: var(--surface);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none; /* still scrolls on short screens, without a visible bar */
+  }
+
+  .app-sidebar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .app-sidebar .app-nav {
+    flex: 1;
+  }
+
+  .app-sidebar-brand {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-height: 3.5rem;
+    padding: 0.75rem 0.25rem 0.75rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+
+    @media (width >= 64rem) {
+      min-height: 4rem;
+    }
+  }
+
+  .app-sidebar-brand .font-extrabold,
+  .app-canvas header .font-extrabold {
+    font-weight: 800;
+  }
+
+  .app-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .app-nav-group-label {
+    padding-inline: 0.75rem;
+    margin-bottom: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+
+  /* Settings sits at the bottom of the desktop sidebar */
+  .app-nav-pinned {
+    margin-top: auto;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .app-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 2.75rem;
+    padding-inline: 0.75rem;
+    border-radius: var(--radius-control);
+    font-size: 0.9375rem;
+    font-weight: 400;
+    color: var(--foreground);
+    transition:
+      background-color 150ms ease,
+      color 150ms ease;
+  }
+
+  .app-sidebar .app-nav-item {
+    @media (width >= 64rem) {
+      min-height: 2.5rem;
+    }
+  }
+
+  .app-nav-icon {
+    opacity: 0.72;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    a.app-nav-item:hover {
+      background-color: var(--fog);
+    }
+  }
+
+  /* Active: green fill plus weight, never colour alone */
+  .app-nav-item[aria-current="page"],
+  a.app-nav-item[aria-current="page"]:hover {
+    background-color: var(--sprout);
+    color: var(--ink);
+    font-weight: 700;
+  }
+
+  .app-nav-item[aria-current="page"] .app-nav-icon {
+    opacity: 1;
+  }
+
+  .app-nav-item[aria-disabled="true"] {
+    color: var(--muted-foreground);
+  }
+
+  .badge-soon {
+    padding: 0.125rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+
+  /* ---- Top bar: the one elevated plane ---- */
+
+  .app-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 3.5rem;
+    padding: 0.5rem 1rem;
+    background-color: var(--surface);
+    box-shadow: var(--nav-shadow);
+
+    @media (width >= 48rem) {
+      padding-inline: 1.5rem;
+    }
+
+    @media (width >= 64rem) {
+      min-height: 4rem;
+      padding-inline: 2.5rem;
+    }
+  }
+
+  .breadcrumbs ol {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    font-size: 0.8125rem;
+  }
+
+  .breadcrumbs li {
+    align-items: center;
+    min-width: 0;
+  }
+
+  .breadcrumbs-link,
+  .breadcrumbs-current {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2rem;
+    white-space: nowrap;
+    color: var(--foreground);
+  }
+
+  .breadcrumbs-link {
+    font-weight: 400;
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .breadcrumbs-link:hover {
+      text-decoration-thickness: 2px;
+    }
+  }
+
+  .breadcrumbs-current {
+    font-weight: 700;
+  }
+
+  .breadcrumbs-sep {
+    color: var(--muted-foreground);
+  }
+
+  /* Mobile menu: white bordered panel that materialises from its trigger */
+  .app-mobile-menu > summary {
+    min-height: 2.75rem;
+  }
+
+  .app-mobile-panel {
+    position: absolute;
+    left: 0.75rem;
+    right: 0.75rem;
+    top: calc(100% + 0.5rem);
+    max-height: calc(100dvh - 5rem);
+    overflow-y: auto;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    background-color: var(--surface);
+    box-shadow: var(--nav-shadow);
+    transform-origin: top right;
+    transition:
+      opacity 200ms var(--ease-out),
+      transform 200ms var(--ease-out);
+
+    @starting-style {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.98);
+    }
+
+    @media (width >= 48rem) {
+      left: auto;
+      right: 1.5rem;
+      width: 18rem;
+    }
+  }
+
+  /* ---- Main column: 1200px max, centred ---- */
+
+  .app-main {
+    flex: 1;
+    width: 100%;
+    max-width: 75rem;
+    margin-inline: auto;
+    padding: 1.5rem 1rem 4rem;
+
+    @media (width >= 48rem) {
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    @media (width >= 64rem) {
+      padding: 2.5rem 2.5rem 5rem;
+    }
+  }
+
+  /* Onboarding: logo header with a hairline */
+  .app-canvas > header {
+    display: flex;
+    align-items: center;
+    min-height: 4rem;
+    padding-block: 0.75rem;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid var(--border);
+    /* Full-bleed hairline from a narrow container (ink overflow, no scroll) */
+    border-image: conic-gradient(var(--border) 0 0) 0 0 1 0 / 0 0 1px 0 / 0 100vw;
+  }
+
+  /* ---- Page header ---- */
+
+  .page-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .page-header-back {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: 0.375rem;
+    min-height: 2.75rem;
+    font-size: 0.8125rem;
+    font-weight: 400;
+    color: var(--foreground);
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+
+    @media (width >= 48rem) {
+      min-height: 1.75rem;
+    }
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .page-header-back:hover {
+      text-decoration-thickness: 2px;
+    }
+  }
+
+  .icon-tile {
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background-color: var(--surface);
+    color: var(--foreground);
+  }
+
+  .page-header .icon-tile {
+    margin-top: 0.125rem;
+  }
+
+  /* Small round badge on a card's header row (decorative) */
+  .icon-badge {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background-color: var(--surface);
+    color: var(--foreground);
+  }
+
+  .card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  /* ---- Cards: border-defined, never shadowed ---- */
+
+  .app-shell .card,
+  .app-canvas .card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    background-color: var(--surface);
+    box-shadow: none;
+    padding: 1rem;
+
+    @media (width >= 48rem) {
+      padding: 1.5rem;
+    }
+  }
+
+  /* Featured: the emphatic ink border */
+  .app-shell .card-offset,
+  .app-canvas .card-offset {
+    border-color: var(--ink);
+    box-shadow: none;
+
+    @media (width >= 48rem) {
+      box-shadow: none;
+    }
+  }
+
+  /* A card inside a card: same border, same radius, no tonal lift */
+  .app-shell .card .card {
+    border-color: var(--border);
+    border-radius: var(--radius-card);
+    background-color: var(--surface);
+  }
+
+  /* ---- Today: the same prism wash as the empty-state panel, with its
+     label and large action title ---- */
+
+  .app-shell .card-hero {
+    background-image: var(--prism-wash);
+
+    @media (width >= 48rem) {
+      padding: 2rem;
+    }
+  }
+
+  .app-shell .card-hero .card-header .text-heading {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    line-height: 1.48;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+
+  /* Disclosure panels: own chevron instead of the native marker */
+  .app-shell details.card > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    list-style: none;
+  }
+
+  .app-shell details.card > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .app-shell details.card > summary::after {
+    content: "";
+    width: 0.5rem;
+    height: 0.5rem;
+    flex-shrink: 0;
+    margin-right: 0.25rem;
+    border-right: 2px solid var(--foreground);
+    border-bottom: 2px solid var(--foreground);
+    transform: translateY(-2px) rotate(45deg);
+    transition: transform 200ms var(--ease-out);
+  }
+
+  .app-shell details.card[open] > summary::after {
+    transform: translateY(2px) rotate(225deg);
+  }
+
+  /* ---- Controls ---- */
+
+  .app-shell .btn,
+  .app-canvas .btn {
+    min-height: 2.75rem;
+    padding: 0.75rem 1.5rem;
+    border-width: 1px;
+    border-radius: var(--radius-control);
+    font-size: 0.9375rem;
+    font-weight: 700;
+    transition:
+      background-color 150ms ease,
+      border-color 150ms ease,
+      color 150ms ease,
+      transform 160ms var(--ease-out);
+
+    @media (width >= 48rem) {
+      min-height: 2.5rem;
+      padding: 0.5rem 1.5rem;
+    }
+  }
+
+  .app-shell .btn:active:not(:disabled, [aria-disabled="true"]),
+  .app-canvas .btn:active:not(:disabled, [aria-disabled="true"]) {
+    transform: scale(0.97);
+  }
+
+  .app-shell :is(.btn:disabled, .btn[aria-disabled="true"]),
+  .app-canvas :is(.btn:disabled, .btn[aria-disabled="true"]) {
+    opacity: 0.45;
+  }
+
+  .app-shell .btn-sm,
+  .app-canvas .btn-sm {
+    font-size: 0.8125rem;
+    border-radius: var(--radius-control);
+
+    @media (width >= 48rem) {
+      min-height: 2rem;
+      padding: 0.375rem 0.75rem;
+    }
+  }
+
+  .app-shell .btn-lg,
+  .app-canvas .btn-lg {
+    min-height: 3rem;
+    padding: 0.75rem 1.75rem;
+    font-size: 1rem;
+    border-radius: var(--radius-control);
+
+    @media (width >= 48rem) {
+      min-height: 3rem;
+      padding: 0.75rem 1.75rem;
+      font-size: 1rem;
+    }
+  }
+
+  /* Outlined ghost: transparent with an ink border */
+  .app-shell .btn-secondary,
+  .app-canvas .btn-secondary {
+    background-color: transparent;
+    border-color: var(--foreground);
+    color: var(--foreground);
+  }
+
+  .app-shell .btn-ghost,
+  .app-canvas .btn-ghost {
+    background-color: transparent;
+    border-color: transparent;
+    color: var(--foreground);
+  }
+
+  /* Touch: no sticky hover colours. Fine pointers get them below. */
+  .app-shell .btn-primary:hover,
+  .app-canvas .btn-primary:hover {
+    background-color: var(--primary);
+    border-color: var(--primary);
+    color: var(--primary-foreground);
+  }
+
+  .app-shell :is(.btn-secondary, .btn-ghost):hover,
+  .app-canvas :is(.btn-secondary, .btn-ghost):hover {
+    background-color: transparent;
+    color: var(--foreground);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .app-shell .btn-primary:hover,
+    .app-canvas .btn-primary:hover {
+      background-color: var(--primary-hover);
+      border-color: var(--primary-hover);
+      color: var(--primary-hover-foreground);
+    }
+
+    .app-shell .btn-secondary:hover,
+    .app-canvas .btn-secondary:hover {
+      background-color: var(--fog);
+    }
+
+    .app-shell .btn-ghost:hover,
+    .app-canvas .btn-ghost:hover {
+      text-decoration-line: underline;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 0.2em;
+    }
+  }
+
+  .app-shell :is(.input, .textarea, .select),
+  .app-canvas :is(.input, .textarea, .select) {
+    border-width: 1px;
+    border-color: var(--border-strong);
+    border-radius: var(--radius-control);
+    background-color: var(--surface);
+    font-size: 1rem; /* 16px: no zoom on iOS focus */
+  }
+
+  .app-shell :is(.input, .textarea, .select)::placeholder,
+  .app-canvas :is(.input, .textarea, .select)::placeholder {
+    color: var(--muted-foreground);
+  }
+
+  .app-shell :is(.input, .textarea, .select):focus-visible,
+  .app-canvas :is(.input, .textarea, .select):focus-visible {
+    border-color: var(--ring);
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  .app-shell .chip,
+  .app-canvas .chip {
+    border-width: 1px;
+    border-color: var(--border);
+    font-size: 0.8125rem;
+    font-weight: 700;
+  }
+
+  .app-shell .chip:has(input:checked),
+  .app-canvas .chip:has(input:checked) {
+    border-color: var(--ink);
+    background-color: var(--sprout);
+    color: var(--ink);
+  }
+
+  .app-shell .chip:has(input:checked)::before,
+  .app-canvas .chip:has(input:checked)::before {
+    color: var(--ink);
+  }
+
+  .app-shell .alert,
+  .app-canvas .alert {
+    border-width: 1px;
+    border-radius: var(--radius-control);
+  }
+
+  /* ---- Empty-state hero: a soft prism wash is the stage ---- */
+
+  .panel-hero {
+    position: relative;
+    display: grid;
+    place-items: center;
+    min-height: 14rem;
+    padding: 2.5rem 1.25rem;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    background-color: var(--surface);
+    background-image: var(--prism-wash);
+    isolation: isolate;
+
+    @media (width >= 40rem) {
+      min-height: 18rem;
+      padding: 3rem 2rem;
+    }
+  }
+
+  .panel-hero-title {
+    font-size: 1.3125rem;
+    font-weight: 700;
+    line-height: 1.33;
+    letter-spacing: -0.01em;
+  }
+
+  .panel-hero .text-muted-foreground {
+    color: var(--foreground-2);
+  }
+
+  .hero-tile {
+    position: absolute;
+    z-index: -1;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    background-color: var(--surface);
+    color: var(--foreground);
+    pointer-events: none;
+    /* Rare, first-look entrance: short rise and fade, staggered inline */
+    transition:
+      opacity 300ms var(--ease-out),
+      transform 300ms var(--ease-out);
+
+    @starting-style {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+  }
+
+  /* ---- KPI band and tiles ---- */
+
+  .kpi-band {
+    padding: 0;
+    background-color: transparent;
+  }
+
+  .stat-tile {
+    display: grid;
+    align-content: start;
+    gap: 0.25rem;
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    background-color: var(--surface);
+  }
+
+  .stat-tile-label {
+    font-size: 0.8125rem;
+    font-weight: 400;
+    color: var(--muted-foreground);
+  }
+
+  .stat-tile-value {
+    font-size: 2rem;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+
+  .stat-tile-note {
+    font-size: 0.8125rem;
+    line-height: 1.48;
+    color: var(--muted-foreground);
+  }
+
+  /* ---- Comparison pills: fill plus arrow and text, never colour alone ---- */
+
+  .pill-above {
+    border-color: var(--sprout);
+    background-color: var(--sprout);
+    color: var(--ink);
+  }
+
+  .pill-below {
+    border-color: #fbeee0;
+    background-color: #fbeee0;
+    color: #7a4700;
+  }
+
+  .pill-around {
+    border-color: var(--fog);
+    background-color: var(--fog);
+    color: var(--ink);
+  }
+
+  /* ---- Analytics overview: KPI tabs joined to one chart panel ---- */
+
+  .chart-panel {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    background-color: var(--surface);
+  }
+
+  .kpi-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+
+    @media (width >= 48rem) {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  .kpi-tab {
+    display: grid;
+    align-content: start;
+    gap: 0.25rem;
+    min-width: 0;
+    padding: 1rem;
+    text-align: left;
+    background-color: var(--fog);
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background-color 150ms ease;
+
+    @media (width >= 48rem) {
+      padding: 1rem 1.5rem 1.25rem;
+    }
+  }
+
+  /* Hairlines between tabs: right edges, except the last in each row */
+  .kpi-tab:not(:last-child) {
+    border-right: 1px solid var(--border);
+  }
+
+  @media (width < 48rem) {
+    .kpi-tab:nth-child(2n) {
+      border-right: 0;
+    }
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .kpi-tab:hover {
+      background-color: var(--surface);
+    }
+  }
+
+  /* Selected: white, an ink bar on top, and no bottom edge, so it joins the panel */
+  .kpi-tab[aria-selected="true"] {
+    background-color: var(--surface);
+    border-bottom-color: transparent;
+    box-shadow: inset 0 3px 0 var(--ink);
+  }
+
+  .kpi-tab:focus-visible {
+    outline-offset: -3px;
+  }
+
+  .kpi-tab-label {
+    font-size: 0.8125rem;
+    color: var(--muted-foreground);
+  }
+
+  .kpi-tab-value {
+    font-size: 1.75rem;
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .kpi-tab-delta {
+    font-size: 0.8125rem;
+    line-height: 1.48;
+  }
+
+  .chart-panel-body {
+    padding: 1rem;
+
+    @media (width >= 48rem) {
+      padding: 1.5rem;
+    }
+  }
+
+  /* ---- Ranked list, format bars, donut legend, meter ---- */
+
+  .rank {
+    display: grid;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    flex-shrink: 0;
+    margin-top: 0.125rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .format-bar-track {
+    height: 0.5rem;
+    overflow: hidden;
+    border-radius: var(--radius-pill);
+    background-color: var(--fog);
+  }
+
+  .format-bar {
+    height: 100%;
+    border-radius: 0 4px 4px 0;
+    background-image: var(--bar-wash-x);
+    box-shadow: inset 0 0 0 1px var(--bar-edge);
+  }
+
+  .donut-legend {
+    display: grid;
+    gap: 0.25rem;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .donut-legend-row {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    min-height: 2.25rem;
+    padding-inline: 0.5rem;
+    border-radius: var(--radius-control);
+    font-size: 0.875rem;
+    transition: background-color 150ms ease;
+  }
+
+  .donut-legend-row[data-active] {
+    background-color: var(--fog);
+  }
+
+  .donut-swatch {
+    width: 0.75rem;
+    height: 0.75rem;
+    flex-shrink: 0;
+    border-radius: 3px;
+  }
+
+  .meter {
+    height: 0.5rem;
+    overflow: hidden;
+    border-radius: var(--radius-pill);
+    background-color: var(--fog);
+  }
+
+  .meter-fill {
+    height: 100%;
+    border-radius: var(--radius-pill);
+    background-color: var(--ink);
+  }
+
+  /* ---- Skeletons ---- */
+
+  .skeleton {
+    border-radius: var(--radius-control);
+    background-color: var(--fog);
+    animation: skeleton-pulse 1.6s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton {
+      animation: none;
+    }
+
+    /* Keep the fade, drop the movement */
+    .hero-tile,
+    .app-mobile-panel {
+      @starting-style {
+        transform: none;
+      }
+    }
+  }
+}
+
+/* Unlayered: these must beat Tailwind utilities on shared markup. */
+
+/* The hero's action title is the one big moment on the page (beats `text-lg`). */
+.app-shell .card-hero h3 {
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+/* Single family in the app: hooks drop the serif italic and the green bar
+   (beats `font-accent italic border-accent border-l-4`). */
+.app-shell blockquote,
+.app-canvas blockquote {
+  border-left-width: 3px;
+  border-color: var(--foreground);
+  font-family: inherit;
+  font-style: normal;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+/* App rhythm on the 4px grid: 32px between blocks, 16px within, 8px tight. */
+.app-shell .stack-lg,
+.app-canvas .stack-lg {
+  gap: 2rem;
+}
+
+.app-shell .stack-md,
+.app-canvas .stack-md {
+  gap: 1rem;
+}
+
+.app-shell .stack-sm,
+.app-canvas .stack-sm {
+  gap: 0.5rem;
+}
+
+/* Selected tab pills (Opportunities views): a selected state, so green + ink border. */
+.app-shell a.rounded-pill[aria-current="page"] {
+  border-color: var(--ink);
+  background-color: var(--sprout);
+  color: var(--ink);
+}
+
+.app-shell a.rounded-pill[aria-current="page"] .text-muted-foreground {
+  color: var(--slate);
+}
+
+/* Toasts in the app: bordered white, the floating shadow, the app font. */
+body:has(.app-shell, .app-canvas) [data-sonner-toaster] [data-sonner-toast].toast {
+  border: 1px solid var(--border);
+  box-shadow: var(--nav-shadow);
+  font-family: var(--font-app);
+}
+
+body:has(.app-shell, .app-canvas) [data-sonner-toaster] [data-sonner-toast] .toast-title {
+  font-weight: 700;
+}
+
+body:has(.app-shell, .app-canvas) [data-sonner-toaster] [data-sonner-toast] button.toast-action {
+  border-width: 1px;
+  border-radius: var(--radius-control);
+}
+
+@keyframes skeleton-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}

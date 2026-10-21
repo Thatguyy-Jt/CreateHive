@@ -1,9 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
-import Link from "next/link";
 import { Suspense } from "react";
 import { AppHeader } from "@/components/app-shell/app-header";
-import { SidebarNav } from "@/components/app-shell/sidebar-nav";
-import { Logo } from "@/components/marketing/logo";
+import { Sidebar } from "@/components/app-shell/sidebar";
 import { Toaster } from "@/components/ui/toaster";
 import { ensureCurrentUser } from "@/lib/services/current-user";
 
@@ -19,30 +17,21 @@ async function RequireSession() {
 
 export default function AppLayout({ children }: LayoutProps<"/app">) {
   return (
-    <>
+    <div className="app-shell">
       <a href="#main" className="skip-link">
         Skip to content
       </a>
       <Suspense>
         <RequireSession />
       </Suspense>
-      <div className="flex flex-1">
-        <aside className="hidden w-64 shrink-0 border-r border-border bg-surface lg:block">
-          <div className="sticky top-0 flex flex-col gap-8 p-6">
-            <Link href="/app" aria-label="CreateHive dashboard">
-              <Logo />
-            </Link>
-            <SidebarNav label="App" />
-          </div>
-        </aside>
-        <div className="flex min-w-0 flex-1 flex-col">
-          <AppHeader />
-          <main id="main" className="container-wide flex-1 py-8 md:py-12">
-            {children}
-          </main>
-        </div>
+      <Sidebar />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <AppHeader />
+        <main id="main" className="app-main">
+          {children}
+        </main>
       </div>
       <Toaster />
-    </>
+    </div>
   );
 }
