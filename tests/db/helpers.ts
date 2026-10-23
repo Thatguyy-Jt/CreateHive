@@ -46,6 +46,7 @@ export const CORE_TABLES = [
   "notifications",
   "creator_strategies",
   "content_diagnoses",
+  "payments",
 ] as const;
 
 /** A valid `creator_strategies` row's JSON columns, as strings for parameterized inserts. */
@@ -60,18 +61,24 @@ export const STRATEGY_JSON = {
 
 export type CoreTable = (typeof CORE_TABLES)[number];
 
-/** Fresh in-memory Postgres with the Supabase shim and every migration applied in order. */
-export async function createTestDb(): Promise<PGlite> {
+/**
+ * Fresh in-memory Postgres with the Supabase shim and every migration applied
+ * in order. `before` stops ahead of that migration file, to test what it does
+ * to existing rows (then apply it with `applyMigration`).
+ */
+export async function createTestDb(options: { before?: string } = {}): Promise<PGlite> {
   const db = await PGlite.create();
   await db.exec(SUPABASE_SHIM);
 
   const files = readdirSync(MIGRATIONS_DIR)
-    .filter((name) => name.endsWith(".sql"))
+    .filter((name) => name.endsWith(".sql") && (!options.before || name < options.before))
     .sort();
-  for (const file of files) {
-    await db.exec(readFileSync(path.join(MIGRATIONS_DIR, file), "utf8"));
-  }
+  for (const file of files) await applyMigration(db, file);
   return db;
+}
+
+export async function applyMigration(db: PGlite, file: string) {
+  await db.exec(readFileSync(path.join(MIGRATIONS_DIR, file), "utf8"));
 }
 
 type Session =
@@ -217,6 +224,14 @@ export async function seedCreator(db: PGlite, userId: string): Promise<Fixture> 
       content_item_id: itemId,
       prompt_version: "v1",
       diagnosis: JSON.stringify({ schema_version: 1 }),
+    }),
+    payments: await id("payments", {
+      user_id: userId,
+      provider: "paystack",
+      kind: "subscription_start",
+      plan: "pro",
+      reference: `ch_seed_${userId}`,
+      amount_minor: 500_000,
     }),
   };
 

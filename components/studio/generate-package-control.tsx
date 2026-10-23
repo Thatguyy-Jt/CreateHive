@@ -1,5 +1,6 @@
 "use client";
 
+import { UpgradeButton } from "@/components/billing/upgrade-button";
 import { useActionState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { generatePackageAction, type GeneratePackageState } from "@/app/app/studio/actions";
@@ -45,8 +46,9 @@ export function GeneratePackageControl({ itemId, hasPackage }: { itemId: string;
             : "Uses 1 AI generation."}
       </p>
       {error?.message ? (
-        <div role="alert" className="alert">
+        <div role="alert" className="alert stack-sm">
           <p className="font-semibold">{error.message}</p>
+          {error.upgrade ? <UpgradeButton /> : null}
         </div>
       ) : null}
     </div>

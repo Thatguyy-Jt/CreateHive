@@ -12,6 +12,9 @@ const DETAIL_LABELS: Record<string, string> = {
   "/app/analytics": "Post results",
 };
 
+// Named sub-sections, matched by prefix (Settings › Billing, including receipts).
+const SUB_SECTIONS: readonly { prefix: string; label: string }[] = [{ prefix: "/app/settings/billing", label: "Billing" }];
+
 /**
  * "Section › Detail" from the pathname alone. No data, so it can render in the
  * shell. Dashboard isn't repeated as a root crumb: the sidebar already links it.
@@ -25,6 +28,9 @@ export function breadcrumbsFor(pathname: string | null): Crumb[] {
   );
   if (!section) return [{ label: "Dashboard" }];
   if (pathname === section.href) return [{ label: section.label }];
+
+  const sub = SUB_SECTIONS.find(({ prefix }) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  if (sub) return [{ label: section.label, href: section.href }, { label: sub.label }];
 
   const detail = DETAIL_LABELS[section.href];
   if (!detail) return [{ label: section.label }];

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { ALLOWANCE_WINDOW_MS } from "@/lib/billing/features";
 import type { Database } from "@/lib/supabase/database.types";
 
 export type AiDbClient = Pick<SupabaseClient<Database>, "from">;
@@ -31,4 +32,28 @@ export async function checkDailyLimit(
     .or("status.neq.failed,error_code.eq.invalid_output");
   if (error || count === null) return { ok: false, code: error?.code };
   return { ok: true, used: count, reached: count >= limit };
+}
+
+/**
+ * Counts the creator's generations of one kind in the allowance window, with
+ * the same rule as `checkDailyLimit` (provider failures don't count). Same
+ * non-atomic caveat.
+ */
+export async function checkMonthlyAllowance(
+  db: AiDbClient,
+  userId: string,
+  kind: string,
+  allowance: number,
+  now: number,
+): Promise<LimitCheck> {
+  const since = new Date(now - ALLOWANCE_WINDOW_MS).toISOString();
+  const { count, error } = await db
+    .from("ai_generations")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("kind", kind)
+    .gte("created_at", since)
+    .or("status.neq.failed,error_code.eq.invalid_output");
+  if (error || count === null) return { ok: false, code: error?.code };
+  return { ok: true, used: count, reached: count >= allowance };
 }

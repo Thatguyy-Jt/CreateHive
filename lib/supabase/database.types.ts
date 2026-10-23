@@ -813,6 +813,71 @@ export type Database = {
           },
         ]
       }
+      payments: {
+        Row: {
+          amount_minor: number
+          applied_at: string | null
+          created_at: string
+          currency: string
+          failure_reason: string | null
+          id: string
+          kind: string
+          last_checked_at: string | null
+          plan: string
+          provider: string
+          provider_customer_id: string | null
+          provider_order_id: string | null
+          reference: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount_minor: number
+          applied_at?: string | null
+          created_at?: string
+          currency?: string
+          failure_reason?: string | null
+          id?: string
+          kind: string
+          last_checked_at?: string | null
+          plan: string
+          provider: string
+          provider_customer_id?: string | null
+          provider_order_id?: string | null
+          reference: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount_minor?: number
+          applied_at?: string | null
+          created_at?: string
+          currency?: string
+          failure_reason?: string | null
+          id?: string
+          kind?: string
+          last_checked_at?: string | null
+          plan?: string
+          provider?: string
+          provider_customer_id?: string | null
+          provider_order_id?: string | null
+          reference?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       research_signals: {
         Row: {
           created_at: string
@@ -866,11 +931,17 @@ export type Database = {
       subscriptions: {
         Row: {
           cancel_at_period_end: boolean
+          card_brand: string | null
+          card_exp: string | null
+          card_last4: string | null
           created_at: string
           current_period_end: string | null
           id: string
           plan: string
+          provider: string | null
           provider_customer_id: string | null
+          provider_email_token: string | null
+          provider_plan_code: string | null
           provider_subscription_id: string | null
           status: string
           updated_at: string
@@ -878,11 +949,17 @@ export type Database = {
         }
         Insert: {
           cancel_at_period_end?: boolean
+          card_brand?: string | null
+          card_exp?: string | null
+          card_last4?: string | null
           created_at?: string
           current_period_end?: string | null
           id?: string
           plan?: string
+          provider?: string | null
           provider_customer_id?: string | null
+          provider_email_token?: string | null
+          provider_plan_code?: string | null
           provider_subscription_id?: string | null
           status?: string
           updated_at?: string
@@ -890,11 +967,17 @@ export type Database = {
         }
         Update: {
           cancel_at_period_end?: boolean
+          card_brand?: string | null
+          card_exp?: string | null
+          card_last4?: string | null
           created_at?: string
           current_period_end?: string | null
           id?: string
           plan?: string
+          provider?: string | null
           provider_customer_id?: string | null
+          provider_email_token?: string | null
+          provider_plan_code?: string | null
           provider_subscription_id?: string | null
           status?: string
           updated_at?: string

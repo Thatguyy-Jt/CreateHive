@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
+import { UpgradeButton } from "@/components/billing/upgrade-button";
 import { updateInsightsAction } from "@/app/app/insights/actions";
 
 /**
@@ -10,7 +11,7 @@ import { updateInsightsAction } from "@/app/app/insights/actions";
  */
 export function UpdateControl({ again, left }: { again: boolean; left: number }) {
   const [pending, start] = useTransition();
-  const [error, setError] = useState<{ message: string; retryable: boolean } | null>(null);
+  const [error, setError] = useState<{ message: string; retryable: boolean; upgrade?: boolean } | null>(null);
   const [notes, setNotes] = useState<string[]>([]);
 
   function update() {
@@ -18,7 +19,7 @@ export function UpdateControl({ again, left }: { again: boolean; left: number })
     start(async () => {
       const result = await updateInsightsAction();
       if (!result.ok) {
-        setError({ message: result.message, retryable: result.retryable });
+        setError({ message: result.message, retryable: result.retryable, upgrade: result.upgrade });
         return;
       }
       setNotes(result.notes);
@@ -50,9 +51,10 @@ export function UpdateControl({ again, left }: { again: boolean; left: number })
         </p>
       </div>
       {error ? (
-        <p role="alert" className="alert text-sm font-semibold">
-          {error.message}
-        </p>
+        <div role="alert" className="alert stack-sm text-sm">
+          <p className="font-semibold">{error.message}</p>
+          {error.upgrade ? <UpgradeButton /> : null}
+        </div>
       ) : null}
       {notes.length ? (
         <div className="stack-sm">

@@ -13,6 +13,8 @@ export interface SafeLogFields {
   db_code?: string;
   stage?: string;
   name?: string;
+  /** Payment provider (`paystack`). */
+  provider?: string;
   /** Names of missing or invalid environment variables, never their values. */
   variables?: string[];
 }
@@ -25,6 +27,7 @@ const ALLOWED_KEYS: ReadonlySet<string> = new Set([
   "db_code",
   "stage",
   "name",
+  "provider",
   "variables",
 ]);
 

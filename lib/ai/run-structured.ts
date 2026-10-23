@@ -1,11 +1,13 @@
 import type { OpenAILanguageModelResponsesOptions } from "@ai-sdk/openai";
 import { generateText, NoObjectGeneratedError, Output, type LanguageModel, type LanguageModelUsage } from "ai";
 import type { z } from "zod";
+import { getAllowance } from "@/lib/billing/allowance";
+import { allowanceFor } from "@/lib/billing/features";
 import { logEvent } from "@/lib/observability/log";
 import type { ParseResult } from "@/lib/schemas/parse";
 import { isAiEnabled, readAiConfig, type EnvSource } from "./env";
 import { AI_ERRORS, classifyProviderError, type AiErrorCode } from "./errors";
-import { checkDailyLimit, type AiDbClient } from "./limits";
+import { checkDailyLimit, checkMonthlyAllowance, type AiDbClient } from "./limits";
 import { routeTask, type AiTier } from "./models";
 import { costMicros } from "./pricing";
 import { getPrompt, type AiKind, type PromptInput } from "./prompts/registry";
@@ -96,6 +98,7 @@ export async function runStructuredWith<K extends AiKind, Output, Data = Output>
   const model = route.modelId;
 
   try {
+    // Daily abuse guard: the same on every plan.
     const limit = await checkDailyLimit(deps.db, request.userId, config.dailyGenerationLimit, now());
     // Fail closed: without a count there is no cost control.
     if (!limit.ok) {
@@ -103,6 +106,18 @@ export async function runStructuredWith<K extends AiKind, Output, Data = Output>
       return fail("persistence_error");
     }
     if (limit.reached) return fail("limit_reached");
+
+    // The plan's monthly allowance for this task (Free unless they pay).
+    const { plan } = await getAllowance(deps.db, request.userId, now(), env);
+    const allowance = allowanceFor(plan.id, kind);
+    if (allowance !== null) {
+      const monthly = await checkMonthlyAllowance(deps.db, request.userId, kind, allowance, now());
+      if (!monthly.ok) {
+        log("error", "ai_limit_check_failed", { kind, model, stage: "monthly", db_code: monthly.code });
+        return fail("persistence_error");
+      }
+      if (monthly.reached) return fail(plan.id === "free" ? "upgrade_required" : "plan_limit");
+    }
 
     const pending = await deps.db
       .from("ai_generations")

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { UpgradeButton } from "../billing/upgrade-button";
 import type { YouTubeStatus } from "@/lib/services/youtube-refresh";
 import { RefreshYouTubeControl } from "./refresh-youtube-control";
 
@@ -46,6 +47,14 @@ export function YouTubeCard({ status }: { status: YouTubeStatus }) {
       break;
     case "not_configured":
       body = <p>YouTube research isn&apos;t set up yet.</p>;
+      break;
+    case "plan_required":
+      body = (
+        <div className="stack-sm">
+          <p>YouTube research is included in Pro.</p>
+          <UpgradeButton />
+        </div>
+      );
       break;
     default:
       body = <p>We couldn&apos;t check YouTube research right now. Refresh the page to try again.</p>;

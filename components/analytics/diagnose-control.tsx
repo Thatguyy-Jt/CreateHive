@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import { toast } from "sonner";
+import { UpgradeButton } from "@/components/billing/upgrade-button";
 import { diagnosePostAction, type DiagnosisActionState } from "@/app/app/analytics/actions";
 
 const IDLE: DiagnosisActionState = { status: "idle", message: null, retryable: false, submission: 0 };
@@ -33,9 +34,10 @@ export function DiagnoseControl({ itemId, again }: { itemId: string; again: bool
         <p className="field-help">{pending ? "This can take up to a minute." : "Uses 1 AI generation."}</p>
       </div>
       {state.status === "error" && state.message ? (
-        <p role="alert" className="alert text-sm font-semibold">
-          {state.message}
-        </p>
+        <div role="alert" className="alert stack-sm text-sm">
+          <p className="font-semibold">{state.message}</p>
+          {state.upgrade ? <UpgradeButton /> : null}
+        </div>
       ) : null}
     </form>
   );

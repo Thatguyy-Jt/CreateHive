@@ -9,6 +9,13 @@ export interface FakeDbOptions {
   insertGenerationError?: DbError;
   updateGenerationError?: DbError;
   insertUsageError?: DbError;
+  /** The creator's `subscriptions` row (null → Free). */
+  subscription?: Record<string, unknown> | null;
+  subscriptionError?: DbError;
+  /** Count for the per-kind monthly allowance query (default 0). */
+  monthlyCount?: number;
+  /** Rows returned by the monthly usage read (`select("kind")`). */
+  rows?: { kind: string }[];
 }
 
 /**
@@ -25,6 +32,18 @@ export function fakeDb(options: FakeDbOptions = {}) {
 
   const client = {
     from(table: string) {
+      if (table === "subscriptions") {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () =>
+                options.subscriptionError
+                  ? { data: null, error: options.subscriptionError }
+                  : { data: options.subscription ?? null, error: null },
+            }),
+          }),
+        };
+      }
       if (table === "usage_events") {
         return {
           insert: async (row: Record<string, unknown>) => {
@@ -43,7 +62,13 @@ export function fakeDb(options: FakeDbOptions = {}) {
             gte: (column: string, value: unknown) => (query.filters.push([`${column}>=`, value]), builder),
             or: async (expression: string) => {
               query.or = expression;
-              return { count: options.countError ? null : (options.count ?? 0), error: options.countError ?? null };
+              const monthly = query.filters.some(([column]) => column === "kind");
+              const count = monthly ? (options.monthlyCount ?? 0) : (options.count ?? 0);
+              return {
+                data: options.countError ? null : (options.rows ?? []),
+                count: options.countError ? null : count,
+                error: options.countError ?? null,
+              };
             },
           };
           return builder;

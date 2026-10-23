@@ -1,6 +1,8 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { EnvSource } from "@/lib/ai/env";
+import { getAllowance } from "@/lib/billing/allowance";
+import { planIncludes } from "@/lib/billing/features";
 import { logEvent } from "@/lib/observability/log";
 import { readYouTubeConfig, type YouTubeConfig } from "@/lib/research/env";
 import {
@@ -29,6 +31,7 @@ const QUERY_MAX = 300;
 
 export type YouTubeRefreshCode =
   | "not_configured"
+  | "plan_required"
   | "not_on_youtube"
   | "no_strategy"
   | "cached"
@@ -40,6 +43,7 @@ export type YouTubeRefreshCode =
 /** Creator-facing messages: what happened and what to do next. Never include provider text or the key. */
 export const YOUTUBE_ERRORS: Record<YouTubeRefreshCode, string> = {
   not_configured: "YouTube research isn't set up yet.",
+  plan_required: "YouTube research is included in Pro. Upgrade to use it.",
   not_on_youtube: "Add YouTube as a platform in your profile to use YouTube research.",
   no_strategy: "Build your strategy first, so we know which topics to look up.",
   cached: "You've already refreshed today. You can refresh again tomorrow.",
@@ -61,7 +65,7 @@ export interface YouTubeDeps {
 }
 
 export type YouTubeStatus =
-  | { state: "not_configured" | "not_on_youtube" | "no_strategy" | "budget_exhausted" | "error" }
+  | { state: "not_configured" | "plan_required" | "not_on_youtube" | "no_strategy" | "budget_exhausted" | "error" }
   | { state: "available"; lastRefreshedAt: string | null }
   | { state: "cached" | "too_many_attempts"; lastRefreshedAt: string | null; nextRefreshAt: string };
 
@@ -100,6 +104,10 @@ async function checkEligibility(client: Client, admin: Client, userId: string, e
     logEvent("warn", "youtube_not_configured", { variables: configured.variables });
     return { ok: false, status: { state: "not_configured" } };
   }
+
+  // A Pro feature: checked before any quota read or YouTube call.
+  const { plan } = await getAllowance(admin, userId, now, env);
+  if (!planIncludes(plan.id, "youtube_research")) return { ok: false, status: { state: "plan_required" } };
 
   const since = iso(now - REFRESH_WINDOW_MS);
   const [profile, pillars, latest, attempts, budget] = await Promise.all([

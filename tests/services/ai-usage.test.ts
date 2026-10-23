@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AiDbClient } from "@/lib/ai/limits";
 import { LIMIT_WINDOW_MS } from "@/lib/ai/limits";
-import { getAiUsage } from "@/lib/services/ai-usage";
+import { getAiUsage, getPlanUsage } from "@/lib/services/ai-usage";
 import { fakeDb } from "../ai/fake-db";
 
 const USER_ID = "user_secret_123";
@@ -61,5 +61,50 @@ describe("getAiUsage", () => {
 
     await expect(getAiUsage(db, USER_ID, 25, NOW)).resolves.toEqual({ ok: false });
     expect(String(errorLog.mock.calls[0][0])).toContain("TypeError");
+  });
+});
+
+describe("getPlanUsage", () => {
+  const pro = { plan: "pro", status: "active", provider: "paystack", current_period_end: "2099-01-01T00:00:00Z", cancel_at_period_end: true };
+
+  it("counts each feature's uses in the last 30 days against the plan's allowance", async () => {
+    const rows = [
+      ...Array.from({ length: 3 }, () => ({ kind: "content_package" })),
+      { kind: "content_diagnosis" },
+      { kind: "smoke_test" },
+    ];
+    const { db, limitQueries } = fakeDb({ rows });
+
+    const result = await getPlanUsage(db, USER_ID, NOW);
+
+    expect(result.now).toBe(NOW);
+    expect(result.allowance.plan.id).toBe("free");
+    expect(result.monthly.ok).toBe(true);
+    const byKind = Object.fromEntries(
+      (result.monthly.ok ? result.monthly.features : []).map((f) => [f.kind, [f.used, f.limit]]),
+    );
+    expect(byKind).toMatchObject({ content_package: [3, 5], content_diagnosis: [1, 3], creator_strategy: [0, 2] });
+    expect(byKind).not.toHaveProperty("smoke_test");
+    // The same window and failure rule the AI service uses.
+    expect(limitQueries[0].filters).toEqual([
+      ["user_id", USER_ID],
+      ["created_at>=", new Date(NOW - 30 * 24 * 60 * 60 * 1000).toISOString()],
+    ]);
+    expect(limitQueries[0].or).toBe("status.neq.failed,error_code.eq.invalid_output");
+  });
+
+  it("uses Pro allowances for a paying creator", async () => {
+    const { db } = fakeDb({ subscription: pro });
+    const result = await getPlanUsage(db, USER_ID, NOW);
+    expect(result.allowance.plan.id).toBe("pro");
+    expect(result.monthly.ok && result.monthly.features.find((f) => f.kind === "content_package")?.limit).toBe(30);
+  });
+
+  it("reports a failed read without throwing or logging ids", async () => {
+    const { db } = fakeDb({ countError: { code: "42501", message: "denied" } });
+    await expect(getPlanUsage(db, USER_ID, NOW)).resolves.toMatchObject({ monthly: { ok: false } });
+    const logs = errorLog.mock.calls.map((args: unknown[]) => String(args[0])).join("\n");
+    expect(logs).toContain("ai_usage_read_failed");
+    expect(logs).not.toContain(USER_ID);
   });
 });

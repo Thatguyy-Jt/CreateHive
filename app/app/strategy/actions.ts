@@ -13,6 +13,8 @@ export interface StrategyActionState {
   status: "idle" | "error";
   message: string | null;
   retryable: boolean;
+  /** A Free plan allowance was used up: show Upgrade to Pro. */
+  upgrade?: boolean;
 }
 
 /**
@@ -37,7 +39,9 @@ export async function generateStrategyAction(): Promise<StrategyActionState> {
   }
 
   const result = await generateCreatorStrategy(client, userId, { run: runStructured });
-  if (!result.ok) return { status: "error", message: result.message, retryable: result.retryable };
+  if (!result.ok) {
+    return { status: "error", message: result.message, retryable: result.retryable, upgrade: result.code === "upgrade_required" };
+  }
 
   revalidatePath("/app");
   revalidatePath("/app/strategy");

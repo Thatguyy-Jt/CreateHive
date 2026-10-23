@@ -1,10 +1,14 @@
 import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { connection } from "next/server";
-import { isAiEnabled, readDailyGenerationLimit } from "@/lib/ai/env";
+import { isAiEnabled } from "@/lib/ai/env";
+import { endsSoon } from "@/lib/billing/entitlement";
+import { HEADLINE_KIND } from "@/lib/billing/features";
+import { formatBillingDate } from "@/lib/billing/format";
 import { logEvent } from "@/lib/observability/log";
-import { getAiUsage } from "@/lib/services/ai-usage";
+import { getPlanUsage } from "@/lib/services/ai-usage";
 import { createUserClient } from "@/lib/supabase/server";
+import { UpgradeButton } from "../billing/upgrade-button";
 
 /** Same height as the line, so nothing shifts when it loads (or is left out). */
 export function AiUsageLineFallback() {
@@ -15,19 +19,13 @@ export function AiUsageLineFallback() {
   );
 }
 
-/** One line of AI usage, counted as Settings counts it. Secondary: on failure it's left out. */
+/** One line of plan usage, counted as the AI service counts it. Secondary: on failure it's left out. */
 export async function AiUsageLine() {
-  // The count depends on the current time, so it must never be prerendered.
+  // Usage depends on the current time, so it must never be prerendered.
   await connection();
   const { userId } = await auth.protect();
 
   if (!isAiEnabled()) return <p className="field-help">AI features are paused right now.</p>;
-
-  const limit = readDailyGenerationLimit();
-  if (limit === null) {
-    logEvent("error", "ai_usage_read_failed", { stage: "config", variables: ["AI_DAILY_GENERATION_LIMIT"] });
-    return <AiUsageLineFallback />;
-  }
 
   let client;
   try {
@@ -40,15 +38,31 @@ export async function AiUsageLine() {
     return <AiUsageLineFallback />;
   }
 
-  const usage = await getAiUsage(client, userId, limit);
-  if (!usage.ok) return <AiUsageLineFallback />;
+  const { now, allowance, monthly } = await getPlanUsage(client, userId);
+  const headline = monthly.ok ? monthly.features.find((feature) => feature.kind === HEADLINE_KIND) : undefined;
+  if (!headline) return <AiUsageLineFallback />;
 
+  const { entitlement } = allowance;
   return (
-    <p className="field-help">
-      {usage.used} of {usage.limit} AI generations used in the last 24 hours ·{" "}
-      <Link href="/app/settings" className="link">
-        Details
-      </Link>
-    </p>
+    <>
+      <p className="field-help">
+        {headline.used} of {headline.limit} {headline.plural} used this month · {allowance.plan.name} plan ·{" "}
+        {allowance.plan.id === "free" ? (
+          <UpgradeButton variant="link" />
+        ) : (
+          <Link href="/app/settings/billing" className="link">
+            Details
+          </Link>
+        )}
+      </p>
+      {entitlement.paid && entitlement.endsAt && endsSoon(entitlement, now) ? (
+        <p className="field-help">
+          Your {allowance.plan.name} plan ends on {formatBillingDate(entitlement.endsAt, null)}.{" "}
+          <Link href="/app/settings/billing" className="link font-semibold">
+            Renew
+          </Link>
+        </p>
+      ) : null}
+    </>
   );
 }

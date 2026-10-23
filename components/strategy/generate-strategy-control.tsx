@@ -1,5 +1,6 @@
 "use client";
 
+import { UpgradeButton } from "@/components/billing/upgrade-button";
 import { useActionState, useState } from "react";
 import { generateStrategyAction, type StrategyActionState } from "@/app/app/strategy/actions";
 import { REGENERATE_BUTTON_ID } from "@/lib/strategy-notices";
@@ -18,7 +19,7 @@ interface Props {
  * Success redirects with a toast notice; only failures come back as state.
  */
 export function GenerateStrategyControl({ mode, initialError = null }: Props) {
-  const [state, action, pending] = useActionState(
+  const [state, action, pending] = useActionState<StrategyActionState, FormData>(
     generateStrategyAction,
     initialError ? { status: "error", ...initialError } : IDLE,
   );
@@ -40,6 +41,7 @@ export function GenerateStrategyControl({ mode, initialError = null }: Props) {
       {error?.message ? (
         <div role="alert" className="alert stack-sm">
           <p className="font-semibold">{error.message}</p>
+          {error.upgrade ? <UpgradeButton /> : null}
         </div>
       ) : null}
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { UpgradeButton } from "@/components/billing/upgrade-button";
 import { useActionState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { regenerateSectionAction, type GeneratePackageState } from "@/app/app/studio/actions";
@@ -64,8 +65,9 @@ export function RegenerateSectionForm({
           {pending ? "Regenerating… This can take up to a minute." : "Only this section changes. Uses 1 AI generation."}
         </p>
         {error?.message ? (
-          <div role="alert" className="alert">
+          <div role="alert" className="alert stack-sm">
             <p className="font-semibold">{error.message}</p>
+            {error.upgrade ? <UpgradeButton /> : null}
           </div>
         ) : null}
       </form>

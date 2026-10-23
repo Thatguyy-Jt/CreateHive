@@ -29,7 +29,7 @@ function revalidateInsights() {
 
 export type UpdateInsightsActionResult =
   | { ok: true; count: number; notes: string[] }
-  | { ok: false; message: string; retryable: boolean };
+  | { ok: false; message: string; retryable: boolean; upgrade?: boolean };
 
 /** Runs the Learning Agent and replaces the creator's active insights. */
 export async function updateInsightsAction(): Promise<UpdateInsightsActionResult> {
@@ -43,7 +43,9 @@ export async function updateInsightsAction(): Promise<UpdateInsightsActionResult
   const result = await updateCreatorInsights(client, userId, timezone.ok ? timezone.timezone : null, {
     run: runStructured,
   });
-  if (!result.ok) return { ok: false, message: result.message, retryable: result.retryable };
+  if (!result.ok) {
+    return { ok: false, message: result.message, retryable: result.retryable, upgrade: result.code === "upgrade_required" };
+  }
 
   revalidateInsights();
   return { ok: true, count: result.count, notes: result.notes };

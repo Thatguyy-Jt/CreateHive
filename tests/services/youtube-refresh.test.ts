@@ -28,7 +28,17 @@ interface Options {
   usageError?: FakeResult["error"];
   upsert?: FakeResult;
   cleanup?: FakeResult;
+  /** The creator's subscription; Pro by default (YouTube research is a Pro feature). null → Free. */
+  subscription?: Record<string, unknown> | null;
 }
+
+const PRO_ROW = {
+  plan: "pro",
+  status: "active",
+  provider: "paystack",
+  current_period_end: "2099-01-01T00:00:00Z",
+  cancel_at_period_end: true,
+};
 
 function setup(options: Options = {}) {
   const user = fakeSupabase({
@@ -41,6 +51,7 @@ function setup(options: Options = {}) {
     },
   });
   const admin = fakeSupabase({
+    subscriptions: { data: options.subscription === undefined ? PRO_ROW : options.subscription },
     usage_events: (q: RecordedQuery) => {
       if (q.op === "insert") return {};
       if (options.usageError) return { error: options.usageError };
@@ -160,7 +171,7 @@ describe("refreshYouTubeSignals", () => {
       nextRefreshAt: "2026-10-13T08:00:00.000Z",
     });
     expect(fetch).not.toHaveBeenCalled();
-    const check = admin.queries.find((q) => q.filters.some(([, col]) => col === "user_id"))!;
+    const check = admin.queries.find((q) => q.table === "usage_events" && q.filters.some(([, col]) => col === "user_id"))!;
     expect(check.filters).toEqual(
       expect.arrayContaining([
         ["eq", "event_type", "youtube_api"],
@@ -260,5 +271,22 @@ describe("getYouTubeStatus", () => {
     await expect(getYouTubeStatus(user.client, admin.client, USER_ID, { env: {}, now: () => NOW })).resolves.toEqual({
       state: "not_configured",
     });
+  });
+});
+
+describe("YouTube research is a Pro feature", () => {
+  it("tells a Free creator it's in Pro, before any quota read or YouTube call", async () => {
+    const { user, admin } = setup({ subscription: null });
+    const fetch = okFetch();
+
+    await expect(getYouTubeStatus(user.client, admin.client, USER_ID, { env: ENV, now: () => NOW })).resolves.toEqual({
+      state: "plan_required",
+    });
+    const refreshed = await refreshYouTubeSignals(user.client, admin.client, USER_ID, { env: ENV, fetch, now: () => NOW });
+
+    expect(refreshed).toEqual({ ok: false, code: "plan_required", message: YOUTUBE_ERRORS.plan_required });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(admin.queries.filter((q) => q.table === "usage_events")).toEqual([]);
+    expect(user.queries).toEqual([]);
   });
 });

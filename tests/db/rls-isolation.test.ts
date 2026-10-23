@@ -174,6 +174,20 @@ const SPECS: TableSpec[] = [
     }),
   },
   {
+    table: "payments",
+    ops: ["select"],
+    ownerCol: "user_id",
+    update: { status: "succeeded" },
+    payload: (f) => ({
+      user_id: f.userId,
+      provider: "paystack",
+      kind: "subscription_start",
+      plan: "pro",
+      reference: `ch_forged_${f.userId}`,
+      amount_minor: 1,
+    }),
+  },
+  {
     table: "notifications",
     ops: ["select", "update", "delete"],
     ownerCol: "user_id",

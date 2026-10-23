@@ -25,11 +25,13 @@ export const photos = {
 export const announcement =
   "CreateHive is in early development. Follow along as we build.";
 
+// Absolute, so the section links also work from /pricing.
 export const navLinks = [
-  { href: "#how-it-works", label: "How it works" },
-  { href: "#features", label: "Features" },
-  { href: "#creators", label: "Creators" },
-  { href: "#faq", label: "FAQ" },
+  { href: "/#how-it-works", label: "How it works" },
+  { href: "/#features", label: "Features" },
+  { href: "/#creators", label: "Creators" },
+  { href: "/pricing", label: "Pricing" },
+  { href: "/#faq", label: "FAQ" },
 ];
 
 export const platforms = ["YouTube", "TikTok", "Instagram", "LinkedIn", "X", "Podcasts"];

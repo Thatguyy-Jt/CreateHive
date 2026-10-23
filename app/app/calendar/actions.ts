@@ -143,7 +143,7 @@ export async function unscheduleItemAction(previous: CalendarActionState, formDa
 
 export type WeeklyPlanActionResult =
   | { ok: true; slots: ProposedSlot[]; note: string | null }
-  | { ok: false; message: string; retryable: boolean };
+  | { ok: false; message: string; retryable: boolean; upgrade?: boolean };
 
 /** Suggests a week from the creator's saved ideas. Stores nothing, so it revalidates nothing. */
 export async function generateWeeklyPlanAction(weekStart: unknown): Promise<WeeklyPlanActionResult> {
@@ -156,7 +156,9 @@ export async function generateWeeklyPlanAction(weekStart: unknown): Promise<Week
   if (!client) return { ok: false, ...WEEKLY_PLAN_ERRORS.persistence_error };
 
   const result = await generateWeeklyPlan(client, userId, { weekStart: week.data }, { run: runStructured });
-  if (!result.ok) return { ok: false, message: result.message, retryable: result.retryable };
+  if (!result.ok) {
+    return { ok: false, message: result.message, retryable: result.retryable, upgrade: result.code === "upgrade_required" };
+  }
   return { ok: true, slots: result.slots, note: result.note };
 }
 

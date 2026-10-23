@@ -1,5 +1,6 @@
 "use client";
 
+import { UpgradeButton } from "@/components/billing/upgrade-button";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { acceptPlanAction, generateWeeklyPlanAction } from "@/app/app/calendar/actions";
@@ -19,7 +20,7 @@ interface Proposal {
  */
 export function WeekPlanner({ weekStart, unavailable }: { weekStart: string; unavailable: string | null }) {
   const [proposal, setProposal] = useState<Proposal | null>(null);
-  const [error, setError] = useState<{ message: string; retryable: boolean } | null>(null);
+  const [error, setError] = useState<{ message: string; retryable: boolean; upgrade?: boolean } | null>(null);
   const [acceptError, setAcceptError] = useState<string | null>(null);
   const [suggesting, startSuggest] = useTransition();
   const [accepting, startAccept] = useTransition();
@@ -30,7 +31,7 @@ export function WeekPlanner({ weekStart, unavailable }: { weekStart: string; una
     startSuggest(async () => {
       const result = await generateWeeklyPlanAction(weekStart);
       if (result.ok) setProposal({ slots: result.slots, note: result.note });
-      else setError({ message: result.message, retryable: result.retryable });
+      else setError({ message: result.message, retryable: result.retryable, upgrade: result.upgrade });
     });
   }
 
@@ -73,8 +74,9 @@ export function WeekPlanner({ weekStart, unavailable }: { weekStart: string; una
             : (unavailable ?? "Arranges your saved ideas into this week. Uses 1 AI generation.")}
         </p>
         {error ? (
-          <div role="alert" className="alert">
+          <div role="alert" className="alert stack-sm">
             <p className="font-semibold">{error.message}</p>
+            {error.upgrade ? <UpgradeButton /> : null}
           </div>
         ) : null}
       </div>

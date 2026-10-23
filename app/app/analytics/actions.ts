@@ -235,6 +235,8 @@ export interface DiagnosisActionState {
   status: "idle" | "ok" | "error";
   message: string | null;
   retryable: boolean;
+  /** A Free plan allowance was used up: show Upgrade to Pro. */
+  upgrade?: boolean;
   /** Changes on every result, so a control toasts or focuses once. */
   submission: number;
 }
@@ -268,7 +270,7 @@ export async function diagnosePostAction(
     timezone.ok ? timezone.timezone : null,
     { run: runStructured },
   );
-  if (!result.ok) return error(result.message, result.retryable);
+  if (!result.ok) return { ...error(result.message, result.retryable), upgrade: result.code === "upgrade_required" };
 
   revalidatePath(`/app/analytics/${itemId.data}`);
   return { status: "ok", message: null, retryable: false, submission };

@@ -11,6 +11,8 @@ export type AiErrorCode =
   | "disabled"
   | "not_configured"
   | "limit_reached"
+  | "upgrade_required"
+  | "plan_limit"
   | "invalid_output"
   | "rate_limited"
   | "timeout"
@@ -31,7 +33,17 @@ export const AI_ERRORS: Record<AiErrorCode, { message: string; retryable: boolea
     retryable: false,
   },
   limit_reached: {
-    message: "You've reached today's AI generation limit. It resets over the next 24 hours.",
+    message:
+      "You've reached today's AI safety limit. It frees up over the next 24 hours.",
+    retryable: false,
+  },
+  upgrade_required: {
+    message:
+      "You've used this month's allowance for this on the Free plan. Upgrade to Pro for more, or wait for it to free up.",
+    retryable: false,
+  },
+  plan_limit: {
+    message: "You've used this month's allowance for this. It frees up as older uses pass 30 days.",
     retryable: false,
   },
   invalid_output: {

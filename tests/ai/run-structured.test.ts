@@ -244,6 +244,85 @@ describe("runStructuredWith", () => {
     await expect(setup({ db: { count: 25 } }).run()).resolves.toMatchObject({ code: "limit_reached" });
   });
 
+  describe("monthly plan allowances", () => {
+    const pro = {
+      plan: "pro",
+      status: "active",
+      provider: "paystack",
+      current_period_end: "2099-01-01T00:00:00Z",
+      cancel_at_period_end: true,
+    };
+    const weeklyInput = {
+      postingCapacityPerWeek: 3,
+      remainingSlots: 1,
+      platforms: ["youtube"],
+      experienceLevel: null,
+      cadence: [],
+      weekTheme: null,
+      days: [],
+      scheduled: [],
+      ideas: [],
+    };
+
+    // weekly_plan: Free 2, Pro 8 per 30 days.
+    function weekly(db: FakeDbOptions) {
+      const ctx = setup({ db });
+      const run = () => runStructuredWith(ctx.deps, { userId: USER_ID, kind: "weekly_plan", input: weeklyInput, schema });
+      return { ...ctx, run };
+    }
+
+    it("returns upgrade_required for a Free creator at the allowance, without calling the model", async () => {
+      const { run, model, writes, limitQueries } = weekly({ monthlyCount: 2 });
+      await expect(run()).resolves.toMatchObject({ ok: false, code: "upgrade_required", retryable: false });
+      expect(model.doGenerateCalls).toHaveLength(0);
+      expect(writes.generationInserts).toEqual([]);
+      // The monthly count: this kind, last 30 days, provider failures excluded.
+      const monthly = limitQueries.find((q) => q.filters.some(([column]) => column === "kind"))!;
+      expect(monthly.filters).toEqual([
+        ["user_id", USER_ID],
+        ["kind", "weekly_plan"],
+        ["created_at>=", expect.any(String)],
+      ]);
+      expect(monthly.or).toBe("status.neq.failed,error_code.eq.invalid_output");
+    });
+
+    it("lets a Free creator run under the allowance", async () => {
+      await expect(weekly({ monthlyCount: 1 }).run()).resolves.toMatchObject({ ok: true });
+    });
+
+    it("gives Pro the larger allowance, and plan_limit (no upgrade) at its end", async () => {
+      await expect(weekly({ monthlyCount: 7, subscription: pro }).run()).resolves.toMatchObject({ ok: true });
+      await expect(weekly({ monthlyCount: 8, subscription: pro }).run()).resolves.toMatchObject({
+        ok: false,
+        code: "plan_limit",
+      });
+    });
+
+    it("treats an expired pass as Free", async () => {
+      const expired = { ...pro, current_period_end: "2020-01-01T00:00:00Z" };
+      await expect(weekly({ monthlyCount: 2, subscription: expired }).run()).resolves.toMatchObject({
+        code: "upgrade_required",
+      });
+    });
+
+    it("falls back to Free, not an open allowance, when the plan can't be read", async () => {
+      const { run } = weekly({ monthlyCount: 2, subscriptionError: { code: "XX000", message: "boom" } });
+      await expect(run()).resolves.toMatchObject({ ok: false, code: "upgrade_required" });
+      expect(allLogs()).toContain("billing_entitlement_read_failed");
+      expect(allLogs()).not.toContain(USER_ID);
+    });
+
+    it("has no monthly allowance for internal tasks", async () => {
+      const { run, limitQueries } = setup({ db: { monthlyCount: 999 } });
+      await expect(run()).resolves.toMatchObject({ ok: true });
+      expect(limitQueries.some((q) => q.filters.some(([column]) => column === "kind"))).toBe(false);
+    });
+
+    it("keeps the daily guard the same on every plan", async () => {
+      await expect(weekly({ count: 25, subscription: pro }).run()).resolves.toMatchObject({ code: "limit_reached" });
+    });
+  });
+
   it("fails closed when the limit query fails", async () => {
     const { run, model } = setup({ db: { countError: { code: "XX000", message: "boom" } } });
     await expect(run()).resolves.toMatchObject({ ok: false, code: "persistence_error" });

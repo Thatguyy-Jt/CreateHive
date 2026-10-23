@@ -11,7 +11,10 @@ export type IconName =
   | "chart"
   | "target"
   | "search"
-  | "lightbulb";
+  | "lightbulb"
+  | "check-circle"
+  | "eye"
+  | "download";
 
 // 24px grid, 1.75 stroke, drawn in currentColor. Always decorative: the label
 // next to an icon carries the meaning.
@@ -65,6 +68,12 @@ const PATHS: Record<IconName, ReactNode> = {
       <path d="M12 3.5 13.8 9l5.7 1.2-4.4 3.8 1.2 5.5L12 16.6l-4.3 2.9 1.2-5.5L4.5 10.2 10.2 9 12 3.5Z" />
     </>
   ),
+  billing: (
+    <>
+      <rect x="3" y="5.5" width="18" height="13" rx="2" />
+      <path d="M3 10h18M7 15h3" />
+    </>
+  ),
   settings: (
     <>
       <circle cx="12" cy="12" r="3" />
@@ -72,6 +81,24 @@ const PATHS: Record<IconName, ReactNode> = {
     </>
   ),
   plus: <path d="M12 5v14M5 12h14" />,
+  "check-circle": (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="m8.5 12.2 2.4 2.4 4.6-4.9" />
+    </>
+  ),
+  eye: (
+    <>
+      <path d="M2.8 12s3.4-6.2 9.2-6.2 9.2 6.2 9.2 6.2-3.4 6.2-9.2 6.2S2.8 12 2.8 12Z" />
+      <circle cx="12" cy="12" r="2.6" />
+    </>
+  ),
+  download: (
+    <>
+      <path d="M12 4v11m-4.5-4.5L12 15l4.5-4.5" />
+      <path d="M5 19.5h14" />
+    </>
+  ),
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   "arrow-left": <path d="M19 12H5m6-6-6 6 6 6" />,
   "chevron-right": <path d="m9 6 6 6-6 6" />,

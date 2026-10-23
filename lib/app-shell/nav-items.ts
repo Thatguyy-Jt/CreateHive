@@ -9,6 +9,7 @@ export type NavIconName =
   | "studio"
   | "analytics"
   | "insights"
+  | "billing"
   | "settings";
 
 /** Sidebar sections, in display order. `null` items are pinned at the bottom. */

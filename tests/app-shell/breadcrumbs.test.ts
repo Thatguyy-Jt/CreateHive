@@ -35,3 +35,12 @@ describe("breadcrumbsFor", () => {
     expect(breadcrumbsFor("/onboarding")).toEqual([{ label: "Dashboard" }]);
   });
 });
+
+describe("breadcrumbsFor settings sub-sections", () => {
+  it("names Billing and its receipts under Settings", () => {
+    const billing = [{ label: "Settings", href: "/app/settings" }, { label: "Billing" }];
+    expect(breadcrumbsFor("/app/settings/billing")).toEqual(billing);
+    expect(breadcrumbsFor("/app/settings/billing/receipts/abc")).toEqual(billing);
+    expect(breadcrumbsFor("/app/settings/billingx")).toEqual([{ label: "Settings" }]);
+  });
+});

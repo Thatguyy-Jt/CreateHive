@@ -67,6 +67,8 @@ export interface GeneratePackageState {
   status: "idle" | "ok" | "error";
   message: string | null;
   retryable: boolean;
+  /** A Free plan allowance was used up: show Upgrade to Pro. */
+  upgrade?: boolean;
   /** Changes on every result, so the control toasts once. */
   submission: number;
   versionNo?: number;
@@ -93,7 +95,7 @@ export async function generatePackageAction(
   if (!client) return error(STUDIO_ERRORS.persistence_error.message, true);
 
   const result = await generateContentPackage(client, userId, itemId.data, { run: runStructured });
-  if (!result.ok) return error(result.message, result.retryable);
+  if (!result.ok) return { ...error(result.message, result.retryable), upgrade: result.code === "upgrade_required" };
 
   revalidatePath(`/app/studio/${itemId.data}`);
   revalidatePath("/app/studio");
@@ -224,7 +226,7 @@ export async function regenerateSectionAction(
     { section: field(formData, "section"), baseVersion: baseVersion.data, instruction: field(formData, "instruction") },
     { run: runStructured },
   );
-  if (!result.ok) return error(result.message, result.retryable);
+  if (!result.ok) return { ...error(result.message, result.retryable), upgrade: result.code === "upgrade_required" };
 
   revalidatePath(`/app/studio/${itemId.data}`);
   return { status: "ok", message: null, retryable: false, submission, versionNo: result.versionNo };

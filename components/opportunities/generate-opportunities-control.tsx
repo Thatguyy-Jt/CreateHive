@@ -1,5 +1,6 @@
 "use client";
 
+import { UpgradeButton } from "@/components/billing/upgrade-button";
 import { useActionState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { generateOpportunitiesAction, type GenerateOpportunitiesState } from "@/app/app/opportunities/actions";
@@ -34,8 +35,9 @@ export function GenerateOpportunitiesControl() {
         {pending ? "Finding ideas… this can take up to a minute." : "Uses 1 AI generation for 5 ideas."}
       </p>
       {error?.message ? (
-        <div role="alert" className="alert">
+        <div role="alert" className="alert stack-sm">
           <p className="font-semibold">{error.message}</p>
+          {error.upgrade ? <UpgradeButton /> : null}
         </div>
       ) : null}
     </div>

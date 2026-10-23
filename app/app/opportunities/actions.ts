@@ -18,6 +18,8 @@ export interface GenerateOpportunitiesState {
   status: "idle" | "ok" | "error";
   message: string | null;
   retryable: boolean;
+  /** A Free plan allowance was used up: show Upgrade to Pro. */
+  upgrade?: boolean;
   created: number;
 }
 
@@ -39,7 +41,15 @@ export async function generateOpportunitiesAction(): Promise<GenerateOpportuniti
   }
 
   const result = await generateContentOpportunities(client, userId, { run: runStructured });
-  if (!result.ok) return { status: "error", message: result.message, retryable: result.retryable, created: 0 };
+  if (!result.ok) {
+    return {
+      status: "error",
+      message: result.message,
+      retryable: result.retryable,
+      upgrade: result.code === "upgrade_required",
+      created: 0,
+    };
+  }
 
   revalidatePath("/app/opportunities");
   // New ideas change the dashboard's recommendation.

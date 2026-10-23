@@ -15,7 +15,7 @@ Mark a task `[x]` when it is finished. When every task in a phase is checked, ch
 | 3 | Opportunity Engine | ✅ DONE |
 | 4 | Content Studio | ✅ DONE |
 | 5 | Analytics and Learning | ✅ DONE |
-| 6 | Billing | ⬜ Not done |
+| 6 | Billing | ✅ DONE |
 | 7 | Reliability | ⬜ Not done |
 | 8 | Beta | ⬜ Not done |
 | 9 | Public Launch | ⬜ Not done |
@@ -75,14 +75,20 @@ Mark a task `[x]` when it is finished. When every task in a phase is checked, ch
 - [x] Learning feedback loop into recommendations
 - [x] Analytics and insights routes (`/app/analytics`, `/app/insights`)
 
-## Phase 6 — Billing — ⬜ Not done
+## Phase 6 — Billing — ✅ DONE
 
-- [ ] Plans
-- [ ] Checkout (Stripe)
-- [ ] Subscription state (`subscriptions`)
-- [ ] Usage metering (`usage_events`, per-user limits)
-- [ ] Webhooks
-- [ ] Billing page (`/app/billing`)
+Payment provider: **Paystack** (monthly card subscriptions, NGN) instead of Stripe. Stripe doesn't onboard Nigerian businesses, and most creators are expected to be in Nigeria (owner decision, 2026-10-21). See `prompts/billing-paystack-opay.md`.
+
+Part 3 (`prompts/billing-paystack-only.md`, owner decision 2026-10-23): **OPay removed**. Its sandbox was never confirmed and its onboarding blocked testing. Paystack is the only provider, and Pro is ₦12,000 a month.
+
+Part 2 (`prompts/pricing-and-billing-settings.md`): **Free and Pro only** (Studio removed), per-feature monthly allowances instead of a daily count, a public `/pricing` page, billing moved into Settings › Billing (receipts, CSV export, card on file), and Upgrade to Pro prompts on the dashboard and at Free limits.
+
+- [x] Plans (Free / Pro) and public pricing page (`/pricing`)
+- [x] Checkout (Paystack)
+- [x] Subscription state (`subscriptions`, `payments`)
+- [x] Usage metering (`usage_events`, per-feature monthly allowances)
+- [x] Webhooks (`/api/webhooks/paystack`)
+- [x] Billing in Settings (`/app/settings/billing`)
 
 ## Phase 7 — Reliability — ⬜ Not done
 

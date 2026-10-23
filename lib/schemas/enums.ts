@@ -8,7 +8,23 @@ import { z } from "zod";
 export const subscriptionStatus = z.enum(["active", "trialing", "past_due", "canceled", "incomplete"]);
 export type SubscriptionStatus = z.infer<typeof subscriptionStatus>;
 
-export const experienceLevel = z.enum(["beginner", "growing", "established"]);
+export const subscriptionPlan = z.enum(["free", "pro"]);
+export type SubscriptionPlan = z.infer<typeof subscriptionPlan>;
+
+/** Plans that can be bought. `payments.plan` is checked as `= 'pro'` (one value), so it is not in `DB_ENUM_COLUMNS`. */
+export const paidPlan = z.enum(["pro"]);
+export type PaidPlan = z.infer<typeof paidPlan>;
+
+export const billingProvider = z.enum(["paystack"]);
+export type BillingProvider = z.infer<typeof billingProvider>;
+
+export const paymentKind = z.enum(["subscription_start", "renewal"]);
+export type PaymentKind = z.infer<typeof paymentKind>;
+
+export const paymentStatus = z.enum(["pending", "succeeded", "failed"]);
+export type PaymentStatus = z.infer<typeof paymentStatus>;
+
+export const experienceLevel =z.enum(["beginner", "growing", "established"]);
 export type ExperienceLevel = z.infer<typeof experienceLevel>;
 
 export const onboardingStatus = z.enum(["not_started", "in_progress", "completed"]);
@@ -54,6 +70,11 @@ export type GenerationStatus = z.infer<typeof generationStatus>;
 /** `table.column` → schema, for every column with a value-list `check` constraint. */
 export const DB_ENUM_COLUMNS = {
   "subscriptions.status": subscriptionStatus,
+  "subscriptions.plan": subscriptionPlan,
+  "subscriptions.provider": billingProvider,
+  "payments.provider": billingProvider,
+  "payments.kind": paymentKind,
+  "payments.status": paymentStatus,
   "creator_profiles.experience_level": experienceLevel,
   "creator_profiles.onboarding_status": onboardingStatus,
   "content_ideas.difficulty": difficulty,
