@@ -92,11 +92,17 @@ Part 2 (`prompts/pricing-and-billing-settings.md`): **Free and Pro only** (Studi
 
 ## Phase 7 — Reliability — ⬜ Not done
 
+Split into parts (owner decision, 2026-10-23): 1. data export and deletion, 2. background jobs, 3. monitoring and alerting, 4. Playwright smoke tests, 5. performance. Background jobs run on **Vercel Cron + `CRON_SECRET`-protected route handlers**, not Inngest or Trigger.dev.
+
+Part 1 (`prompts/data-export-and-deletion.md`): JSON export at `/app/settings/export`, account deletion in Settings (stops Paystack renewal, cascades every row, deletes the Clerk user), and a Clerk `user.deleted` webhook at `/api/webhooks/clerk`.
+
+Part 2 (`prompts/background-jobs-cron.md`): a daily, idempotent maintenance job at `/api/cron/daily` (`vercel.json`, 04:00 UTC, `CRON_SECRET`). It marks abandoned `pending` AI generations as failed, deletes expired research signals, and reconciles Paystack subscriptions and pending checkouts that lost webhooks. A failed task is retried by the next run.
+
 - [ ] Error handling and recovery for all AI / external calls
 - [ ] Monitoring and alerting
-- [ ] Background jobs with retries (Inngest / Trigger.dev, Vercel Cron)
+- [x] Background jobs with retries (Vercel Cron)
 - [ ] Tests (Vitest, Playwright)
-- [ ] Data handling (export, deletion)
+- [x] Data handling (export, deletion)
 - [ ] Performance improvements
 
 ## Phase 8 — Beta — ⬜ Not done

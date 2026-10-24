@@ -234,7 +234,8 @@ export async function runStructuredWith<K extends AiKind, Output, Data = Output>
     };
   } catch (error) {
     // Unexpected (for example a network failure talking to Supabase). The
-    // pending row, if any, stays pending and counts until cleanup exists.
+    // pending row, if any, counts until the daily maintenance job marks it
+    // `abandoned` (lib/jobs/daily-maintenance.ts).
     log("error", "ai_generation_unexpected", {
       kind,
       model,

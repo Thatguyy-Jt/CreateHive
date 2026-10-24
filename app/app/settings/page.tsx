@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AccountSection } from "@/components/settings/account-section";
 import { AiUsageSection } from "@/components/settings/ai-usage-section";
+import { DataSection } from "@/components/settings/data-section";
 import { PrivacySection } from "@/components/settings/privacy-section";
 import { TimezoneSection } from "@/components/settings/timezone-section";
 
@@ -15,6 +16,7 @@ export default function SettingsPage() {
       <TimezoneSection />
       <AiUsageSection />
       <PrivacySection />
+      <DataSection />
     </div>
   );
 }

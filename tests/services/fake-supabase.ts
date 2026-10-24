@@ -39,7 +39,7 @@ export function fakeSupabase(
 
   function builder(query: RecordedQuery) {
     const chain: Record<string, unknown> = {};
-    for (const method of ["eq", "gte", "lt", "order", "limit", "in", "neq", "or", "like"]) {
+    for (const method of ["eq", "gte", "lt", "order", "limit", "in", "neq", "or", "like", "range", "not", "lte"]) {
       chain[method] = (...args: unknown[]) => {
         query.filters.push([method, ...args]);
         return chain;

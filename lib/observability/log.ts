@@ -17,6 +17,8 @@ export interface SafeLogFields {
   provider?: string;
   /** Names of missing or invalid environment variables, never their values. */
   variables?: string[];
+  /** How many rows a job touched. */
+  count?: number;
 }
 
 const ALLOWED_KEYS: ReadonlySet<string> = new Set([
@@ -29,6 +31,7 @@ const ALLOWED_KEYS: ReadonlySet<string> = new Set([
   "name",
   "provider",
   "variables",
+  "count",
 ]);
 
 function sanitize(fields: SafeLogFields): SafeLogFields {
@@ -39,9 +42,9 @@ function sanitize(fields: SafeLogFields): SafeLogFields {
 /**
  * One JSON line to the console, as before. Errors are also sent to Sentry as a
  * message tagged with the same fields. Never pass or forward `Error` objects:
- * provider errors contain the prompt. Warnings stay in the console.
+ * provider errors contain the prompt. Warnings and info stay in the console.
  */
-export function logEvent(level: "error" | "warn", event: string, fields: SafeLogFields = {}): void {
+export function logEvent(level: "error" | "warn" | "info", event: string, fields: SafeLogFields = {}): void {
   const safe = sanitize(fields);
   console[level](JSON.stringify({ event, ...safe }));
 

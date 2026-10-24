@@ -750,6 +750,88 @@ export async function handlePaystackEvent(deps: BillingDeps, event: PaystackEven
 }
 
 // ---------------------------------------------------------------------------
+// Reconciliation (daily job): catches what lost webhooks missed
+// ---------------------------------------------------------------------------
+
+/** Subscriptions this close to (or this far past) their period end are re-read. */
+export const RECONCILE_DUE_AHEAD_MS = DAY_MS;
+export const RECONCILE_LAPSED_MS = 7 * DAY_MS;
+/** Pending checkouts younger than this are still in flight. */
+export const RECONCILE_PENDING_MIN_AGE_MS = 10 * 60 * 1000;
+
+export type ReconcileResult = { ok: true; skipped: boolean; subscriptions: number; payments: number } | { ok: false };
+
+/**
+ * Re-reads due or recently lapsed Paystack subscriptions (a renewal whose
+ * webhooks were lost would otherwise drop a paying creator to Free) and
+ * confirms checkouts still pending. Bounded per run by `limit` rows each and a
+ * time budget checked before every provider call; what's left waits for the
+ * next run. Idempotent, like the webhook paths it reuses. Counts rows checked.
+ */
+export async function reconcilePaystack(
+  deps: BillingDeps,
+  { limit = 25, budgetMs = 40_000 }: { limit?: number; budgetMs?: number } = {},
+): Promise<ReconcileResult> {
+  if (!deps.paystack || !deps.config.paystack) return { ok: true, skipped: true, subscriptions: 0, payments: 0 };
+  const started = deps.now();
+  const overBudget = () => deps.now() - started >= budgetMs;
+  const iso = (ms: number) => new Date(ms).toISOString();
+
+  try {
+    const due = await deps.db
+      .from("subscriptions")
+      .select("provider_subscription_id")
+      .eq("provider", "paystack")
+      .not("provider_subscription_id", "is", null)
+      .neq("status", "canceled")
+      .gte("current_period_end", iso(started - RECONCILE_LAPSED_MS))
+      .lte("current_period_end", iso(started + RECONCILE_DUE_AHEAD_MS))
+      .order("current_period_end", { ascending: true })
+      .limit(limit);
+    if (due.error) {
+      log("error", "billing_reconcile_failed", { provider: "paystack", stage: "subscriptions", db_code: due.error.code });
+      return { ok: false };
+    }
+
+    let subscriptions = 0;
+    for (const row of due.data ?? []) {
+      if (overBudget()) return { ok: true, skipped: false, subscriptions, payments: 0 };
+      await syncByCode(deps, row.provider_subscription_id!);
+      subscriptions += 1;
+    }
+
+    const pending = await deps.db
+      .from("payments")
+      .select(PAYMENT_COLUMNS)
+      .eq("provider", "paystack")
+      .eq("status", "pending")
+      .gte("created_at", iso(started - PENDING_EXPIRY_MS))
+      .lte("created_at", iso(started - RECONCILE_PENDING_MIN_AGE_MS))
+      .order("created_at", { ascending: true })
+      .limit(limit);
+    if (pending.error) {
+      log("error", "billing_reconcile_failed", { provider: "paystack", stage: "payments", db_code: pending.error.code });
+      return { ok: false };
+    }
+
+    let payments = 0;
+    for (const row of (pending.data ?? []) as PaymentRow[]) {
+      if (overBudget()) break;
+      await confirmPayment(deps, row);
+      payments += 1;
+    }
+    return { ok: true, skipped: false, subscriptions, payments };
+  } catch (error) {
+    log("error", "billing_reconcile_failed", {
+      provider: "paystack",
+      stage: "unexpected",
+      name: error instanceof Error ? error.name : typeof error,
+    });
+    return { ok: false };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Creator actions: return page, Check status, cancel, manage card
 // ---------------------------------------------------------------------------
 

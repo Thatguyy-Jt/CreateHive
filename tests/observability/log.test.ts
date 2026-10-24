@@ -57,6 +57,19 @@ describe("logEvent", () => {
     expect(Sentry.captureMessage).not.toHaveBeenCalled();
   });
 
+  it("keeps info in the console only, with counts", () => {
+    const infoLog = vi.spyOn(console, "info").mockImplementation(() => {});
+    logEvent("info", "cron_task_done", { name: "expired_signals", count: 3 });
+
+    expect(JSON.parse(infoLog.mock.calls[0][0] as string)).toEqual({
+      event: "cron_task_done",
+      name: "expired_signals",
+      count: 3,
+    });
+    expect(Sentry.captureMessage).not.toHaveBeenCalled();
+    infoLog.mockRestore();
+  });
+
   it("works with no fields", () => {
     logEvent("error", "something_happened");
     expect(JSON.parse(errorLog.mock.calls[0][0] as string)).toEqual({ event: "something_happened" });

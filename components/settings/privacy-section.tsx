@@ -58,10 +58,12 @@ export function PrivacySection() {
           and your account removed. Page views are measured with Vercel Analytics, which doesn&apos;t use cookies.
         </li>
         <li>
-          Downloading your data: <span className="text-muted-foreground">Coming later</span>
+          You can download all of this as one file from <strong>Your data</strong> below.
         </li>
         <li>
-          Deleting your account and data: <span className="text-muted-foreground">Coming later</span>
+          Deleting your account (below) stops any Pro renewal, then permanently deletes your account, your login and
+          everything listed here, including your payment records (Paystack keeps its own). Deleting your account from
+          the account settings window does the same.
         </li>
       </ul>
     </section>

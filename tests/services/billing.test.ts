@@ -9,6 +9,7 @@ import {
   getReceipt,
   listPaymentsForExport,
   handlePaystackEvent,
+  reconcilePaystack,
   resetPlanCache,
   startCheckout,
   type BillingDeps,
@@ -34,15 +35,22 @@ function memoryDb(seed: { subscriptions?: Row[]; payments?: Row[] } = {}, fail: 
   function query(table: string, op: string, payload?: Row, options?: { head?: boolean }) {
     const filters: [string, string, unknown][] = [];
     let single = false;
+    let max = Infinity;
     const run = () => {
       if (fail.table === table && (!fail.op || fail.op === op)) return { data: null, error: { code: "XX000" }, count: null };
       const rows = tables[table];
       const match = (r: Row) =>
-        filters.every(([kind, column, value]) =>
-          kind === "eq" ? r[column] === value : kind === "gte" ? String(r[column]) >= String(value) : true,
-        );
+        filters.every(([kind, column, value]) => {
+          if (kind === "eq") return r[column] === value;
+          if (kind === "neq") return r[column] !== value;
+          if (kind === "not_null") return r[column] !== null && r[column] !== undefined;
+          if (r[column] === null || r[column] === undefined) return false;
+          if (kind === "gte") return String(r[column]) >= String(value);
+          if (kind === "lte") return String(r[column]) <= String(value);
+          return true;
+        });
       if (op === "select") {
-        const found = rows.filter(match);
+        const found = rows.filter(match).slice(0, max);
         if (options?.head) return { data: null, error: null, count: found.length };
         return { data: single ? (found[0] ?? null) : found, error: null };
       }
@@ -74,8 +82,12 @@ function memoryDb(seed: { subscriptions?: Row[]; payments?: Row[] } = {}, fail: 
     const chain = {
       eq: (column: string, value: unknown) => (filters.push(["eq", column, value]), chain),
       gte: (column: string, value: unknown) => (filters.push(["gte", column, value]), chain),
+      lte: (column: string, value: unknown) => (filters.push(["lte", column, value]), chain),
+      neq: (column: string, value: unknown) => (filters.push(["neq", column, value]), chain),
+      // Only `.not(column, "is", null)` is used.
+      not: (column: string) => (filters.push(["not_null", column, null]), chain),
       order: () => chain,
-      limit: () => chain,
+      limit: (n: number) => ((max = n), chain),
       select: () => chain,
       maybeSingle: () => ((single = true), chain),
       single: () => ((single = true), chain),
@@ -544,5 +556,86 @@ describe("receipts and export", () => {
     });
     const result = await listPaymentsForExport(db, USER, NOW);
     expect(result.ok && result.payments.map((p) => p.status)).toEqual(["succeeded", "expired"]);
+  });
+});
+
+describe("reconcilePaystack", () => {
+  const HOUR = 60 * 60 * 1000;
+  const ago = (ms: number) => new Date(NOW - ms).toISOString();
+
+  it("re-syncs a lapsed renewal so the creator gets Pro back", async () => {
+    const paystack = paystackFake({
+      fetchSubscription: vi.fn(async () => ({ ok: true, data: subscription({ code: "SUB_old", nextPaymentDate: iso(30) }) })),
+    });
+    const { deps, tables } = setup({ subscriptions: [activeSub({ current_period_end: iso(-1) })], paystack });
+
+    expect(await reconcilePaystack(deps)).toEqual({ ok: true, skipped: false, subscriptions: 1, payments: 0 });
+    expect(paystack.fetchSubscription).toHaveBeenCalledWith("SUB_old");
+    expect(tables.subscriptions[0].current_period_end).toBe(iso(30));
+  });
+
+  it.each([
+    ["not due yet", activeSub({ current_period_end: iso(10) })],
+    ["lapsed over a week ago", activeSub({ current_period_end: iso(-8) })],
+    ["cancelled", activeSub({ current_period_end: iso(0), status: "canceled" })],
+    ["without a subscription code", activeSub({ current_period_end: iso(0), provider_subscription_id: null })],
+    ["a free row", { user_id: USER, plan: "free", status: "active", provider: null, provider_subscription_id: null, current_period_end: null }],
+  ])("leaves a subscription that is %s alone", async (_label, row) => {
+    const { deps, paystack } = setup({ subscriptions: [row] });
+    expect(await reconcilePaystack(deps)).toEqual({ ok: true, skipped: false, subscriptions: 0, payments: 0 });
+    expect(paystack.fetchSubscription).not.toHaveBeenCalled();
+  });
+
+  it("confirms a checkout whose webhook never arrived", async () => {
+    const { deps, tables } = setup({ payments: [pending({ created_at: ago(HOUR) })] });
+
+    expect(await reconcilePaystack(deps)).toEqual({ ok: true, skipped: false, subscriptions: 0, payments: 1 });
+    expect(tables.payments[0].status).toBe("succeeded");
+  });
+
+  it.each([
+    ["still in flight", ago(5 * 60 * 1000)],
+    ["over a day old", ago(25 * HOUR)],
+  ])("ignores a pending checkout that is %s", async (_label, createdAt) => {
+    const { deps, paystack } = setup({ payments: [pending({ created_at: createdAt })] });
+    expect(await reconcilePaystack(deps)).toMatchObject({ ok: true, payments: 0 });
+    expect(paystack.verifyTransaction).not.toHaveBeenCalled();
+  });
+
+  it("handles at most `limit` rows of each kind", async () => {
+    const payments = [1, 2, 3].map((n) =>
+      pending({ id: `11111111-1111-4111-8111-00000000000${n}`, reference: `ch_${n}`, created_at: ago(HOUR) }),
+    );
+    const { deps, paystack } = setup({ payments });
+    expect(await reconcilePaystack(deps, { limit: 2 })).toMatchObject({ ok: true, payments: 2 });
+    expect(paystack.verifyTransaction).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops at the time budget before calling Paystack", async () => {
+    const { deps, paystack } = setup({
+      subscriptions: [activeSub({ current_period_end: iso(0) })],
+      payments: [pending({ created_at: ago(HOUR) })],
+    });
+    expect(await reconcilePaystack(deps, { budgetMs: 0 })).toEqual({ ok: true, skipped: false, subscriptions: 0, payments: 0 });
+    expect(paystack.fetchSubscription).not.toHaveBeenCalled();
+    expect(paystack.verifyTransaction).not.toHaveBeenCalled();
+  });
+
+  it("fails when a selection can't be read", async () => {
+    const { deps } = setup({ fail: { table: "payments", op: "select" } });
+    expect(await reconcilePaystack(deps)).toEqual({ ok: false });
+  });
+
+  it("is skipped when Paystack isn't configured", async () => {
+    const { deps } = setup({ paystack: null, config: { appUrl: "https://app.test", paystack: null } });
+    expect(await reconcilePaystack(deps)).toEqual({ ok: true, skipped: true, subscriptions: 0, payments: 0 });
+  });
+
+  it("changes nothing on a second run", async () => {
+    const { deps, tables } = setup({ payments: [pending({ created_at: ago(HOUR) })] });
+    await reconcilePaystack(deps);
+    const after = JSON.stringify(tables);
+    expect(await reconcilePaystack(deps)).toMatchObject({ ok: true, payments: 0 });
+    expect(JSON.stringify(tables)).toBe(after);
   });
 });
