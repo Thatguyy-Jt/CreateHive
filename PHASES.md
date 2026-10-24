@@ -98,10 +98,19 @@ Part 1 (`prompts/data-export-and-deletion.md`): JSON export at `/app/settings/ex
 
 Part 2 (`prompts/background-jobs-cron.md`): a daily, idempotent maintenance job at `/api/cron/daily` (`vercel.json`, 04:00 UTC, `CRON_SECRET`). It marks abandoned `pending` AI generations as failed, deletes expired research signals, and reconciles Paystack subscriptions and pending checkouts that lost webhooks. A failed task is retried by the next run.
 
+Part 3 (`prompts/monitoring-and-alerting.md`):
+- A Sentry cron monitor (`daily-maintenance`) for missed or failed runs.
+- `/api/health` for an uptime monitor.
+- An `area` tag and `environment` on Sentry events.
+- Browser Sentry fixed: it was never enabled.
+- The alert-rule runbook in `docs/monitoring.md`. Alert rules are created by hand in the Sentry UI.
+
+Part 4 (`prompts/playwright-smoke-tests.md`): Playwright smoke tests in `e2e/` (`pnpm test:e2e`), covering public pages at desktop and phone width, onboarding, the data export, the delete-confirm gating and every app page. They run against a dedicated Clerk dev test creator, reset each run, with AI off. Local only for now; see `docs/testing.md`.
+
 - [ ] Error handling and recovery for all AI / external calls
-- [ ] Monitoring and alerting
+- [x] Monitoring and alerting
 - [x] Background jobs with retries (Vercel Cron)
-- [ ] Tests (Vitest, Playwright)
+- [x] Tests (Vitest, Playwright)
 - [x] Data handling (export, deletion)
 - [ ] Performance improvements
 

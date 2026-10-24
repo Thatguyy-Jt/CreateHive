@@ -45,3 +45,8 @@ next-env.d.ts
 
 # allow the variable-name template
 !.env.example
+
+# playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/

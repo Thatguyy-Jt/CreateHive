@@ -1,6 +1,6 @@
 import * as Sentry from "@sentry/nextjs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { logEvent, type SafeLogFields } from "@/lib/observability/log";
+import { areaFor, logEvent, type SafeLogFields } from "@/lib/observability/log";
 
 vi.mock("@sentry/nextjs", () => ({ captureMessage: vi.fn() }));
 
@@ -40,6 +40,7 @@ describe("logEvent", () => {
     expect(Sentry.captureMessage).toHaveBeenCalledWith("ai_generation_failed", {
       level: "error",
       tags: {
+        area: "ai",
         kind: "smoke_test",
         model: "gpt-6-luna",
         code: "provider_error",
@@ -55,6 +56,21 @@ describe("logEvent", () => {
     expect(warnLog).toHaveBeenCalledTimes(1);
     expect(errorLog).not.toHaveBeenCalled();
     expect(Sentry.captureMessage).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["billing_webhook_rejected", "billing"],
+    ["account_delete_failed", "account"],
+    ["cron_task_failed", "cron"],
+    ["ai_generation_failed", "ai"],
+    ["health_check_failed", "health"],
+    ["youtube_refresh_failed", "research"],
+    ["studio_read_failed", "app"],
+  ])("tags %s with area %s in Sentry only", (event, area) => {
+    expect(areaFor(event)).toBe(area);
+    logEvent("error", event, { stage: "x" });
+    expect(JSON.parse(errorLog.mock.calls[0][0] as string)).toEqual({ event, stage: "x" });
+    expect(Sentry.captureMessage).toHaveBeenCalledWith(event, { level: "error", tags: { area, stage: "x" } });
   });
 
   it("keeps info in the console only, with counts", () => {

@@ -29,6 +29,13 @@ describe("baseSentryOptions", () => {
     expect(baseSentryOptions({ NODE_ENV: "production" }).tracesSampleRate).toBe(0.1);
   });
 
+  it("sets the environment from Vercel, falling back to NODE_ENV", () => {
+    expect(baseSentryOptions({ NODE_ENV: "production", NEXT_PUBLIC_VERCEL_ENV: "preview" }).environment).toBe("preview");
+    expect(baseSentryOptions({ NODE_ENV: "production", VERCEL_ENV: "production" }).environment).toBe("production");
+    expect(baseSentryOptions({ NODE_ENV: "development", VERCEL_ENV: " " }).environment).toBe("development");
+    expect(baseSentryOptions({}).environment).toBe("development");
+  });
+
   it("is disabled with no DSN", () => {
     expect(baseSentryOptions({ NODE_ENV: "production" })).toMatchObject({ dsn: undefined, enabled: false });
   });

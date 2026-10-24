@@ -39,6 +39,20 @@ function sanitize(fields: SafeLogFields): SafeLogFields {
   return Object.fromEntries(Object.entries(fields).filter(([key]) => ALLOWED_KEYS.has(key))) as SafeLogFields;
 }
 
+const AREAS: readonly [prefix: string, area: string][] = [
+  ["billing_", "billing"],
+  ["account_", "account"],
+  ["cron_", "cron"],
+  ["ai_", "ai"],
+  ["health_", "health"],
+  ["youtube_", "research"],
+];
+
+/** The Sentry `area` tag for an event name, so alert rules can target billing, account, cron… */
+export function areaFor(event: string): string {
+  return AREAS.find(([prefix]) => event.startsWith(prefix))?.[1] ?? "app";
+}
+
 /**
  * One JSON line to the console, as before. Errors are also sent to Sentry as a
  * message tagged with the same fields. Never pass or forward `Error` objects:
@@ -50,7 +64,7 @@ export function logEvent(level: "error" | "warn" | "info", event: string, fields
 
   if (level !== "error") return;
   try {
-    const tags: Record<string, string> = {};
+    const tags: Record<string, string> = { area: areaFor(event) };
     for (const [key, value] of Object.entries(safe)) {
       tags[key] = Array.isArray(value) ? value.join(",") : String(value);
     }

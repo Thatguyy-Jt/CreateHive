@@ -27,10 +27,19 @@ export function scrubEvent<T extends Event>(event: T): T {
   return event;
 }
 
+/**
+ * `production`, `preview` or `development` on Vercel, so alert rules can
+ * ignore previews. The browser only sees the `NEXT_PUBLIC_` copy.
+ */
+export function sentryEnvironment(env: EnvSource = process.env): string {
+  return env.NEXT_PUBLIC_VERCEL_ENV?.trim() || env.VERCEL_ENV?.trim() || env.NODE_ENV || "development";
+}
+
 export function baseSentryOptions(env: EnvSource = process.env) {
   return {
     dsn: env.NEXT_PUBLIC_SENTRY_DSN?.trim() || undefined,
     enabled: sentryEnabled(env),
+    environment: sentryEnvironment(env),
     // No IP addresses or cookies by default. Replay and the feedback widget are
     // deliberately not enabled: they would record creator content.
     sendDefaultPii: false,
