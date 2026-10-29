@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ABANDONED_AFTER_MS,
   deleteExpiredSignals,
+  expireBreakdownSources,
   expireAbandonedGenerations,
   runDailyMaintenance,
 } from "@/lib/jobs/daily-maintenance";
@@ -46,15 +47,37 @@ describe("deleteExpiredSignals", () => {
   });
 });
 
+describe("expireBreakdownSources", () => {
+  it("nulls YouTube data past its expiry, keeping the breakdown", async () => {
+    const { client, queries } = fakeSupabase({ video_breakdowns: { count: 4 } });
+
+    expect(await expireBreakdownSources(client, NOW)).toEqual({ ok: true, count: 4 });
+    expect(queries[0]).toMatchObject({
+      op: "update",
+      payload: { source_data: null },
+      filters: [
+        ["not", "source_data", "is", null],
+        ["lt", "source_expires_at", new Date(NOW).toISOString()],
+      ],
+    });
+  });
+
+  it("reports a DB error", async () => {
+    const { client } = fakeSupabase({ video_breakdowns: { error: pgError("42501") } });
+    expect(await expireBreakdownSources(client, NOW)).toEqual({ ok: false, db_code: "42501" });
+  });
+});
+
 describe("runDailyMaintenance", () => {
   it("runs every task and reports counts; Paystack is skipped without billing", async () => {
-    const { client } = fakeSupabase({ ai_generations: { count: 1 }, research_signals: { count: 0 } });
+    const { client } = fakeSupabase({ ai_generations: { count: 1 }, research_signals: { count: 0 }, video_breakdowns: { count: 2 } });
 
     expect(await runDailyMaintenance({ db: client, billing: null, now: () => NOW })).toEqual({
       ok: true,
       tasks: {
         abandoned_generations: { ok: true, count: 1 },
         expired_signals: { ok: true, count: 0 },
+        expired_breakdown_sources: { ok: true, count: 2 },
         paystack: { ok: true, skipped: true },
       },
     });
@@ -64,6 +87,7 @@ describe("runDailyMaintenance", () => {
     const { client, queries } = fakeSupabase({
       ai_generations: new Error("network"),
       research_signals: { count: 3 },
+      video_breakdowns: { count: 0 },
     });
 
     const summary = await runDailyMaintenance({ db: client, billing: null, now: () => NOW });
@@ -71,11 +95,11 @@ describe("runDailyMaintenance", () => {
     expect(summary.ok).toBe(false);
     expect(summary.tasks.abandoned_generations).toEqual({ ok: false });
     expect(summary.tasks.expired_signals).toEqual({ ok: true, count: 3 });
-    expect(queries.map((q) => q.table)).toEqual(["ai_generations", "research_signals"]);
+    expect(queries.map((q) => q.table)).toEqual(["ai_generations", "research_signals", "video_breakdowns"]);
   });
 
   it("reports Paystack reconciliation counts, and a failed reconciliation", async () => {
-    const { client } = fakeSupabase({ ai_generations: { count: 0 }, research_signals: { count: 0 } });
+    const { client } = fakeSupabase({ ai_generations: { count: 0 }, research_signals: { count: 0 }, video_breakdowns: { count: 0 } });
     const billing = {
       paystack: {},
       config: { appUrl: "x", paystack: { secretKey: "k", planCodes: { pro: "P" } } },

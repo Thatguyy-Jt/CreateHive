@@ -9,7 +9,7 @@ export type ReasoningEffort = "low" | "medium";
  * `AI_MODEL_FAST` override the IDs without a code change.
  */
 export const AI_TIERS: Record<AiTier, { defaultModel: string; reasoning: ReasoningEffort }> = {
-  // Strategy, opportunities, content packages, diagnosis, insights.
+  // Strategy, opportunities, content packages, diagnosis, insights, video breakdowns.
   quality: { defaultModel: "gpt-6.1-sol", reasoning: "medium" },
   // Rewrites, variations, tagging.
   fast: { defaultModel: "gpt-6-luna", reasoning: "low" },
@@ -31,6 +31,7 @@ export const AI_TASK_ROUTES: Record<AiKind, TaskRoute> = {
   content_section: { tier: "quality", maxOutputTokens: 4_000 },
   content_diagnosis: { tier: "quality", maxOutputTokens: 3_000 },
   creator_insights: { tier: "quality", maxOutputTokens: 4_000 },
+  video_breakdown: { tier: "quality", maxOutputTokens: 5_000 },
 };
 
 export interface ResolvedRoute {

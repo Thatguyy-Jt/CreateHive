@@ -46,6 +46,7 @@ const AREAS: readonly [prefix: string, area: string][] = [
   ["ai_", "ai"],
   ["health_", "health"],
   ["youtube_", "research"],
+  ["video_breakdown_", "research"],
 ];
 
 /** The Sentry `area` tag for an event name, so alert rules can target billing, account, cron… */

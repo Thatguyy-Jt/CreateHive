@@ -16,7 +16,10 @@ function rows(): ComparisonRow[] {
   return [
     ...QUOTA_FEATURES.map((feature) => ({
       label: `${feature.label} per month`,
-      cells: byPlan((plan) => ({ kind: "count", value: PLAN_ALLOWANCES[plan][feature.kind] })),
+      cells: byPlan((plan) => {
+        const value = PLAN_ALLOWANCES[plan][feature.kind];
+        return value === 0 ? { kind: "no" } : { kind: "count", value };
+      }),
     })),
     ...Object.values(GATED_FEATURES).map((feature) => ({
       label: feature.label,

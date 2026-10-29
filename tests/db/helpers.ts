@@ -47,6 +47,7 @@ export const CORE_TABLES = [
   "creator_strategies",
   "content_diagnoses",
   "payments",
+  "video_breakdowns",
 ] as const;
 
 /** A valid `creator_strategies` row's JSON columns, as strings for parameterized inserts. */
@@ -232,6 +233,15 @@ export async function seedCreator(db: PGlite, userId: string): Promise<Fixture> 
       plan: "pro",
       reference: `ch_seed_${userId}`,
       amount_minor: 500_000,
+    }),
+    video_breakdowns: await id("video_breakdowns", {
+      user_id: userId,
+      platform: "tiktok",
+      source_url: "https://www.tiktok.com/@someone/video/1234567890",
+      external_id: "1234567890",
+      facts: JSON.stringify({ source: "creator_entered" }),
+      prompt_version: "v1",
+      breakdown: JSON.stringify({ schema_version: 1 }),
     }),
   };
 

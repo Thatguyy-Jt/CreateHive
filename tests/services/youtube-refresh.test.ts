@@ -180,6 +180,18 @@ describe("refreshYouTubeSignals", () => {
     );
   });
 
+  it("isn't blocked by Video Breakdown lookups, which share the event type", async () => {
+    const lookup = (h: number) => ({
+      created_at: `2026-10-12T0${h}:00:00.000Z`,
+      metadata: { kind: "video_breakdown", outcome: "ok" },
+    });
+    const { user, admin } = setup({ attempts: [lookup(8), lookup(7), lookup(6)] });
+    const fetch = okFetch();
+    const result = await refreshYouTubeSignals(user.client, admin.client, USER_ID, { env: ENV, fetch, now: () => NOW });
+    expect(result.ok).toBe(true);
+    expect(fetch).toHaveBeenCalled();
+  });
+
   it("stops after 3 failed attempts in 24h", async () => {
     const failedTry = (h: number) => ({ created_at: `2026-10-12T0${h}:00:00.000Z`, metadata: { outcome: "api_error" } });
     const { user, admin } = setup({ attempts: [failedTry(9), failedTry(8), failedTry(7)] });

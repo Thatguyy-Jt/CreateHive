@@ -27,6 +27,8 @@ export const MAX_ATTEMPTS_PER_WINDOW = 3;
 /** YouTube API data is kept this long, well inside the platform's storage limit. */
 export const YOUTUBE_SIGNAL_TTL_MS = 7 * DAY;
 export const USAGE_EVENT_TYPE = "youtube_api";
+/** `metadata.kind` of Video Breakdown lookups metered under the same event type. */
+export const BREAKDOWN_USAGE_KIND = "video_breakdown";
 const QUERY_MAX = 300;
 
 export type YouTubeRefreshCode =
@@ -146,7 +148,11 @@ async function checkEligibility(client: Client, admin: Client, userId: string, e
   if (!niche || !pillars.data?.length) return { ok: false, status: { state: "no_strategy" } };
 
   const lastRefreshedAt = latest.data?.fetched_at ?? null;
-  const tries = attempts.data ?? [];
+  // Video Breakdown lookups share the event type (and the app-wide budget) but
+  // not this per-creator refresh window.
+  const tries = (attempts.data ?? []).filter(
+    (row) => (row.metadata as { kind?: unknown } | null)?.kind !== BREAKDOWN_USAGE_KIND,
+  );
   const success = tries.find((row) => (row.metadata as { outcome?: unknown } | null)?.outcome === "ok");
   if (success) {
     return {

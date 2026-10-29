@@ -188,9 +188,17 @@ function UsageCard({ monthly, plan }: { monthly: MonthlyUsageResult; plan: Entit
       </div>
       {monthly.ok ? (
         <div className="grid gap-x-8 gap-y-5 md:grid-cols-2">
-          {monthly.features.map((feature) => (
-            <UsageMeter key={feature.kind} id={`usage-${feature.kind}`} feature={feature} />
-          ))}
+          {monthly.features.map((feature) =>
+            // A 0 allowance means the plan doesn't include it: say so instead of a full meter.
+            feature.limit === 0 ? (
+              <div key={feature.kind} className="stack-sm">
+                <p className="text-sm font-semibold">{feature.label}</p>
+                <p className="text-sm text-muted-foreground">Pro only</p>
+              </div>
+            ) : (
+              <UsageMeter key={feature.kind} id={`usage-${feature.kind}`} feature={feature} />
+            ),
+          )}
           <div className="stack-sm">
             <p className="text-sm font-semibold">{GATED_FEATURES.youtube_research.label}</p>
             <p className="text-sm text-muted-foreground">

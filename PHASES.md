@@ -125,6 +125,17 @@ Remaining: the error-handling item below has no part yet.
 - [x] Data handling (export, deletion)
 - [x] Performance improvements
 
+## Pre-beta addition — Video Breakdown (Pro)
+
+Owner request, 2026-10-29 (`prompts/video-breakdown.md`): at `/app/breakdown`, a Pro creator pastes a link to any public video. They get why it likely worked and their own version (hooks, outline, title, CTA) for their niche, pillars and voice, saved as an idea for Studio.
+
+- **YouTube** is fetched through the official Data API (3 units, shared budget).
+- **TikTok** is manual like the other platforms. The oEmbed caption prefill was dropped on 2026-10-29 because TikTok's oEmbed no longer returns the caption.
+- **Every other platform** uses numbers the creator types in, guided by per-platform "where to find these numbers" instructions.
+- **No scraping**, and no video downloads.
+- **Allowance:** 15 a month on Pro, not included on Free.
+- **Storage:** YouTube data is dropped after 30 days by the daily job.
+
 ## Phase 8 — Beta — ⬜ Not done
 
 - [ ] Onboard ~20–50 creators

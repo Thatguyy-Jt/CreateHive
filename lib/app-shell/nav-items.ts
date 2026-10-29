@@ -5,6 +5,7 @@ export type NavIconName =
   | "strategy"
   | "opportunities"
   | "research"
+  | "breakdown"
   | "calendar"
   | "studio"
   | "analytics"
@@ -27,6 +28,7 @@ export type NavItem =
         | "/app/strategy"
         | "/app/opportunities"
         | "/app/research"
+        | "/app/breakdown"
         | "/app/calendar"
         | "/app/studio"
         | "/app/analytics"
@@ -40,6 +42,7 @@ export const navItems: NavItem[] = [
   { label: "Strategy", status: "live", icon: "strategy", group: "Plan", href: "/app/strategy" },
   { label: "Opportunities", status: "live", icon: "opportunities", group: "Plan", href: "/app/opportunities" },
   { label: "Research", status: "live", icon: "research", group: "Plan", href: "/app/research" },
+  { label: "Breakdown", status: "live", icon: "breakdown", group: "Plan", href: "/app/breakdown" },
   { label: "Calendar", status: "live", icon: "calendar", group: "Create", href: "/app/calendar" },
   { label: "Studio", status: "live", icon: "studio", group: "Create", href: "/app/studio" },
   { label: "Analytics", status: "live", icon: "analytics", group: "Measure", href: "/app/analytics" },

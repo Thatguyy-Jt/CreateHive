@@ -25,6 +25,7 @@ export const EXPORT_TABLES = {
   creator_insights: { omit: [] },
   research_signals: { omit: [] },
   competitors: { omit: [] },
+  video_breakdowns: { omit: [] },
   assets: { omit: [] },
   notifications: { omit: [] },
   // Provider handles and the email token: no use to the creator, and the token can manage the subscription.

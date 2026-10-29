@@ -28,6 +28,7 @@ export const QUOTA_FEATURES: readonly QuotaFeature[] = [
   { kind: "creator_strategy", label: "Strategy generations", singular: "strategy generation", plural: "strategy generations" },
   { kind: "creator_insights", label: "Insights updates", singular: "insights update", plural: "insights updates" },
   { kind: "weekly_plan", label: "Weekly plan suggestions", singular: "weekly plan", plural: "weekly plans" },
+  { kind: "video_breakdown", label: "Video breakdowns", singular: "video breakdown", plural: "video breakdowns" },
 ];
 
 /** The headline number on the dashboard: the product's core output. */
@@ -46,6 +47,8 @@ export const PLAN_ALLOWANCES: Record<SubscriptionPlan, Record<QuotaKind, number>
     content_diagnosis: 3,
     creator_insights: 2,
     weekly_plan: 2,
+    // Pro only: 0 shows as "Not included" and is refused before any YouTube call.
+    video_breakdown: 0,
   },
   pro: {
     creator_strategy: 6,
@@ -55,6 +58,7 @@ export const PLAN_ALLOWANCES: Record<SubscriptionPlan, Record<QuotaKind, number>
     content_diagnosis: 30,
     creator_insights: 8,
     weekly_plan: 8,
+    video_breakdown: 15,
   },
 };
 
@@ -95,6 +99,9 @@ export function planHighlights(plan: SubscriptionPlan): string[] {
     const feature = quotaFeature(kind);
     return `${allowances[kind]} ${allowances[kind] === 1 ? feature.singular : feature.plural} a month`;
   });
-  if (plan === "pro") return [...lines, "YouTube research", "Everything in Free"];
+  if (plan === "pro") {
+    const breakdowns = allowances.video_breakdown;
+    return [...lines, `${breakdowns} ${quotaFeature("video_breakdown").plural} a month`, "YouTube research", "Everything in Free"];
+  }
   return [...lines, "Unlimited analytics, calendar and editing"];
 }

@@ -45,6 +45,12 @@ const PATHS: Record<IconName, ReactNode> = {
       <path d="m20 20-4.2-4.2" />
     </>
   ),
+  breakdown: (
+    <>
+      <rect x="3.5" y="5" width="17" height="14" rx="2" />
+      <path d="m10.5 9.5 4 2.5-4 2.5v-5Z" />
+    </>
+  ),
   calendar: (
     <>
       <rect x="3.5" y="5" width="17" height="15.5" rx="2" />

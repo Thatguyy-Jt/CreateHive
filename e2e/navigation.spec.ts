@@ -14,6 +14,7 @@ const PAGES = [
   "/app/analytics",
   "/app/insights",
   "/app/research",
+  "/app/breakdown",
   "/app/settings",
   "/app/settings/billing",
 ];

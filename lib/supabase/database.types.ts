@@ -1065,6 +1065,65 @@ export type Database = {
         }
         Relationships: []
       }
+      video_breakdowns: {
+        Row: {
+          ai_generation_id: string | null
+          breakdown: Json
+          created_at: string
+          creator_input: Json
+          external_id: string | null
+          facts: Json
+          id: string
+          platform: string
+          prompt_version: string
+          source_data: Json | null
+          source_expires_at: string | null
+          source_fetched_at: string | null
+          source_url: string
+          user_id: string
+        }
+        Insert: {
+          ai_generation_id?: string | null
+          breakdown: Json
+          created_at?: string
+          creator_input?: Json
+          external_id?: string | null
+          facts: Json
+          id?: string
+          platform: string
+          prompt_version: string
+          source_data?: Json | null
+          source_expires_at?: string | null
+          source_fetched_at?: string | null
+          source_url: string
+          user_id: string
+        }
+        Update: {
+          ai_generation_id?: string | null
+          breakdown?: Json
+          created_at?: string
+          creator_input?: Json
+          external_id?: string | null
+          facts?: Json
+          id?: string
+          platform?: string
+          prompt_version?: string
+          source_data?: Json | null
+          source_expires_at?: string | null
+          source_fetched_at?: string | null
+          source_url?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_breakdowns_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

@@ -190,3 +190,190 @@ export async function searchTopVideos(request: SearchRequest): Promise<YouTubeSe
     })),
   };
 }
+
+// ---------------------------------------------------------------------------
+// One video's details (Video Breakdown)
+// ---------------------------------------------------------------------------
+
+/** `videos.list` + `channels.list` + `commentThreads.list`, 1 unit each. */
+export const VIDEO_DETAILS_UNITS = 3;
+export const DESCRIPTION_MAX = 3_000;
+export const TAGS_MAX = 20;
+export const COMMENTS_MAX = 20;
+export const COMMENT_CHARS_MAX = 300;
+
+export interface YouTubeVideoDetails {
+  videoId: string;
+  title: string;
+  description: string;
+  tags: string[];
+  channelId: string;
+  channelTitle: string;
+  publishedAt: string;
+  durationSeconds: number | null;
+  viewCount: number | null;
+  likeCount: number | null;
+  commentCount: number | null;
+  /** Null when the channel hides it or the read failed. */
+  subscriberCount: number | null;
+  /** Top comment text only: no authors, ids or avatars. Never stored. */
+  comments: string[];
+}
+
+export type VideoDetailsErrorCode = YouTubeErrorCode | "video_unavailable";
+
+export type VideoDetailsResult =
+  | { ok: true; video: YouTubeVideoDetails; unitsSpent: number }
+  | { ok: false; code: VideoDetailsErrorCode; unitsSpent: number };
+
+/** ISO-8601 duration ("PT1M35S", "P1DT2H") → seconds; null for zero (live) or unreadable. */
+export function parseIsoDuration(value: string | undefined): number | null {
+  const match = value ? /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/.exec(value) : null;
+  if (!match) return null;
+  const [, d, h, m, s] = match.map((part) => Number(part ?? 0));
+  const seconds = d * 86_400 + h * 3_600 + m * 60 + s;
+  return seconds > 0 ? seconds : null;
+}
+
+const detailsResponse = z.object({
+  items: z
+    .array(
+      z
+        .object({
+          id: videoId,
+          snippet: z
+            .object({
+              title: z.string().max(500),
+              description: z.string().default(""),
+              tags: z.array(z.string()).default([]),
+              channelId: z.string().max(100),
+              channelTitle: z.string().max(200).default(""),
+              publishedAt: z.iso.datetime({ offset: true }),
+            })
+            .loose(),
+          contentDetails: z.object({ duration: z.string().optional() }).loose().optional(),
+          statistics: z.object({ viewCount: count, likeCount: count, commentCount: count }).loose().optional(),
+        })
+        .loose(),
+    )
+    .default([]),
+});
+
+const channelsResponse = z.object({
+  items: z
+    .array(
+      z
+        .object({
+          statistics: z
+            .object({ subscriberCount: count, hiddenSubscriberCount: z.boolean().optional() })
+            .loose()
+            .optional(),
+        })
+        .loose(),
+    )
+    .default([]),
+});
+
+const commentsResponse = z.object({
+  items: z
+    .array(
+      z
+        .object({
+          snippet: z
+            .object({
+              topLevelComment: z
+                .object({ snippet: z.object({ textOriginal: z.string() }).loose() })
+                .loose(),
+            })
+            .loose(),
+        })
+        .loose(),
+    )
+    .default([]),
+});
+
+export interface VideoDetailsRequest {
+  apiKey: string;
+  videoId: string;
+  fetch?: FetchLike;
+}
+
+const clip = (text: string, max: number) => text.replace(/\s+/g, " ").trim().slice(0, max);
+
+/**
+ * Title, description, tags, length and statistics of one public video, its
+ * channel's subscriber count and up to 20 top comments. Never throws. A
+ * missing channel count or comments (disabled, failed) is not a failure. A
+ * request that reached YouTube counts toward quota even when it failed.
+ */
+export async function fetchVideoDetails(request: VideoDetailsRequest): Promise<VideoDetailsResult> {
+  const fetchFn = request.fetch ?? (globalThis.fetch as unknown as FetchLike);
+  if (!videoId.safeParse(request.videoId).success) return { ok: false, code: "video_unavailable", unitsSpent: 0 };
+
+  const videoParams = new URLSearchParams({
+    part: "snippet,statistics,contentDetails",
+    id: request.videoId,
+    key: request.apiKey,
+  });
+  const details = await call(fetchFn, `${YOUTUBE_API_BASE}/videos?${videoParams}`);
+  let spent = details.ok || details.responded ? VIDEOS_UNITS : 0;
+  if (!details.ok) return { ok: false, code: details.code, unitsSpent: spent };
+  const parsed = detailsResponse.safeParse(details.body);
+  if (!parsed.success) return { ok: false, code: "invalid_response", unitsSpent: spent };
+  const item = parsed.data.items.find((entry) => entry.id === request.videoId);
+  // Private, deleted or never existed: YouTube returns no item.
+  if (!item) return { ok: false, code: "video_unavailable", unitsSpent: spent };
+
+  const channelParams = new URLSearchParams({ part: "statistics", id: item.snippet.channelId, key: request.apiKey });
+  const commentParams = new URLSearchParams({
+    part: "snippet",
+    videoId: request.videoId,
+    order: "relevance",
+    maxResults: String(COMMENTS_MAX),
+    textFormat: "plainText",
+    key: request.apiKey,
+  });
+  const [channel, comments] = await Promise.all([
+    call(fetchFn, `${YOUTUBE_API_BASE}/channels?${channelParams}`),
+    call(fetchFn, `${YOUTUBE_API_BASE}/commentThreads?${commentParams}`),
+  ]);
+  for (const result of [channel, comments]) if (result.ok || result.responded) spent += 1;
+
+  let subscriberCount: number | null = null;
+  if (channel.ok) {
+    const stats = channelsResponse.safeParse(channel.body);
+    const entry = stats.success ? stats.data.items[0]?.statistics : undefined;
+    subscriberCount = entry && !entry.hiddenSubscriberCount ? entry.subscriberCount : null;
+  }
+
+  let topComments: string[] = [];
+  if (comments.ok) {
+    const thread = commentsResponse.safeParse(comments.body);
+    if (thread.success) {
+      topComments = thread.data.items
+        .map((entry) => clip(entry.snippet.topLevelComment.snippet.textOriginal, COMMENT_CHARS_MAX))
+        .filter(Boolean)
+        .slice(0, COMMENTS_MAX);
+    }
+  }
+
+  return {
+    ok: true,
+    unitsSpent: spent,
+    video: {
+      videoId: item.id,
+      title: item.snippet.title,
+      description: item.snippet.description.slice(0, DESCRIPTION_MAX),
+      tags: item.snippet.tags.map((tag) => clip(tag, 100)).filter(Boolean).slice(0, TAGS_MAX),
+      channelId: item.snippet.channelId,
+      channelTitle: item.snippet.channelTitle,
+      publishedAt: item.snippet.publishedAt,
+      durationSeconds: parseIsoDuration(item.contentDetails?.duration),
+      viewCount: item.statistics?.viewCount ?? null,
+      likeCount: item.statistics?.likeCount ?? null,
+      commentCount: item.statistics?.commentCount ?? null,
+      subscriberCount,
+      comments: topComments,
+    },
+  };
+}

@@ -14,7 +14,7 @@ export const ABANDONED_AFTER_MS = 15 * 60 * 1000;
 /** Stored in `ai_generations.error_code`; like provider failures, it doesn't count toward limits. */
 export const ABANDONED_CODE = "abandoned";
 
-export type TaskName = "abandoned_generations" | "expired_signals" | "paystack";
+export type TaskName = "abandoned_generations" | "expired_signals" | "expired_breakdown_sources" | "paystack";
 export type TaskResult = { ok: boolean; count?: number; skipped?: boolean };
 export interface MaintenanceSummary {
   ok: boolean;
@@ -50,6 +50,20 @@ export async function deleteExpiredSignals(db: AdminDb, now: number): Promise<Co
     .from("research_signals")
     .delete({ count: "exact" })
     .lt("expires_at", new Date(now).toISOString());
+  return error ? { ok: false, db_code: error.code } : { ok: true, count: count ?? 0 };
+}
+
+/**
+ * Drops YouTube API data from video breakdowns past `source_expires_at` (30
+ * days, the YouTube API Services storage limit). The creator's input and the
+ * AI breakdown are kept. Served by `video_breakdowns_source_expires_idx`.
+ */
+export async function expireBreakdownSources(db: AdminDb, now: number): Promise<CountResult> {
+  const { error, count } = await db
+    .from("video_breakdowns")
+    .update({ source_data: null }, { count: "exact" })
+    .not("source_data", "is", null)
+    .lt("source_expires_at", new Date(now).toISOString());
   return error ? { ok: false, db_code: error.code } : { ok: true, count: count ?? 0 };
 }
 
@@ -97,6 +111,9 @@ export async function runDailyMaintenance(deps: MaintenanceDeps): Promise<Mainte
       expireAbandonedGenerations(deps.db, deps.now()),
     ),
     expired_signals: await runCountTask("expired_signals", () => deleteExpiredSignals(deps.db, deps.now())),
+    expired_breakdown_sources: await runCountTask("expired_breakdown_sources", () =>
+      expireBreakdownSources(deps.db, deps.now()),
+    ),
     paystack: await runPaystack(deps.billing),
   };
   return { ok: Object.values(tasks).every((t) => t.ok), tasks };

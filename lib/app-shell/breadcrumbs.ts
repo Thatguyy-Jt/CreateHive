@@ -10,6 +10,7 @@ export interface Crumb {
 const DETAIL_LABELS: Record<string, string> = {
   "/app/studio": "Content package",
   "/app/analytics": "Post results",
+  "/app/breakdown": "Video breakdown",
 };
 
 // Named sub-sections, matched by prefix (Settings › Billing, including receipts).
