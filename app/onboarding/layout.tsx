@@ -1,10 +1,11 @@
 import Link from "next/link";
+import { nunitoSans } from "@/app/app-font";
 import { Logo } from "@/components/marketing/logo";
 
 // A focused setup flow outside the /app shell: logo only, no sidebar.
 export default function OnboardingLayout({ children }: LayoutProps<"/onboarding">) {
   return (
-    <div className="app-canvas">
+    <div className={`app-canvas ${nunitoSans.variable}`}>
       <a href="#main" className="skip-link">
         Skip to content
       </a>

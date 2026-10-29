@@ -14,9 +14,10 @@ async function pingDatabase(): Promise<PingResult> {
   } catch (error) {
     return { ok: false, name: error instanceof Error ? error.name : typeof error };
   }
+  // One indexed row: a count would scan the whole table on every uptime check.
   const { error } = await db
     .from("users")
-    .select("id", { head: true, count: "exact" })
+    .select("id")
     .limit(1)
     .abortSignal(AbortSignal.timeout(PING_TIMEOUT_MS));
   return error ? { ok: false, db_code: error.code || undefined, name: error.name || undefined } : { ok: true };

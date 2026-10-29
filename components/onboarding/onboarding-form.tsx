@@ -3,13 +3,13 @@
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { saveProfileAction, saveVoiceAction, type OnboardingFormState } from "@/app/onboarding/actions";
 import {
+  CREATOR_GOALS,
   EXPERIENCE_LABELS,
+  EXPERIENCE_LEVELS,
   GOAL_LABELS,
   PLATFORM_LABELS,
-  creatorGoal,
-  platform,
-} from "@/lib/schemas/creator";
-import { experienceLevel } from "@/lib/schemas/enums";
+  PLATFORMS,
+} from "@/lib/schemas/labels";
 import type { BrandProfileRow, CreatorProfileRow } from "@/lib/services/creator-profile";
 import { ChipGroup, SelectField, TextAreaField, TextField } from "./fields";
 
@@ -125,14 +125,14 @@ export function OnboardingForm({ profile, brand, startStep, hasStrategy }: Onboa
           name="goals"
           label="Your goals"
           help="Pick up to three."
-          options={toOptions(creatorGoal.options, GOAL_LABELS)}
+          options={toOptions(CREATOR_GOALS, GOAL_LABELS)}
           defaultValues={profile?.goals}
           error={p.goals}
         />
         <ChipGroup
           name="platforms"
           label="Where you post"
-          options={toOptions(platform.options, PLATFORM_LABELS)}
+          options={toOptions(PLATFORMS, PLATFORM_LABELS)}
           defaultValues={profile?.platforms}
           error={p.platforms}
         />
@@ -152,7 +152,7 @@ export function OnboardingForm({ profile, brand, startStep, hasStrategy }: Onboa
           name="experience_level"
           label="Where you are today"
           placeholder="Choose one"
-          options={toOptions(experienceLevel.options, EXPERIENCE_LABELS)}
+          options={toOptions(EXPERIENCE_LEVELS, EXPERIENCE_LABELS)}
           defaultValue={profile?.experience_level ?? undefined}
           error={p.experience_level}
         />

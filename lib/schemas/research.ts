@@ -1,18 +1,21 @@
 import { z } from "zod";
+import { MANUAL_SIGNAL_TYPES, SIGNAL_SOURCES, SIGNAL_TYPES, type SignalType } from "./labels";
+import { MANUAL_TEXT_MAX } from "./limits";
 import type { EvidenceKind } from "./opportunities";
 
 // Research signals (`research_signals`). `source` and `signal_type` are
-// unconstrained text in the database; the closed vocabularies live here.
+// unconstrained text in the database; the closed vocabularies live in code.
 // Signals are inputs the creator can inspect, never facts (AGENTS.md §12).
 
-export const signalSource = z.enum(["manual", "youtube"]);
-export type SignalSource = z.infer<typeof signalSource>;
+// Value lists, labels and MANUAL_TEXT_MAX are in the zod-free ./labels and
+// ./limits (client components import them from there); re-exported here.
+export { SIGNAL_SOURCE_LABELS, SIGNAL_TYPE_LABELS } from "./labels";
+export type { ManualSignalType, SignalSource, SignalType } from "./labels";
+export { MANUAL_TEXT_MAX } from "./limits";
 
-export const manualSignalType = z.enum(["audience_comment", "competitor_note", "creator_note"]);
-export type ManualSignalType = z.infer<typeof manualSignalType>;
-
-export const signalType = z.enum([...manualSignalType.options, "video"]);
-export type SignalType = z.infer<typeof signalType>;
+export const signalSource = z.enum(SIGNAL_SOURCES);
+export const manualSignalType = z.enum(MANUAL_SIGNAL_TYPES);
+export const signalType = z.enum(SIGNAL_TYPES);
 
 /** The evidence kind an opportunity uses when it cites a signal of this type. */
 export const SIGNAL_EVIDENCE_KIND: Record<SignalType, EvidenceKind> = {
@@ -22,19 +25,6 @@ export const SIGNAL_EVIDENCE_KIND: Record<SignalType, EvidenceKind> = {
   video: "research_signal",
 };
 
-export const SIGNAL_TYPE_LABELS: Record<SignalType, string> = {
-  audience_comment: "Audience comment",
-  competitor_note: "Competitor observation",
-  creator_note: "My own note",
-  video: "YouTube video",
-};
-
-export const SIGNAL_SOURCE_LABELS: Record<SignalSource, string> = {
-  manual: "Pasted by you",
-  youtube: "From YouTube",
-};
-
-export const MANUAL_TEXT_MAX = 1000;
 export const MANUAL_LABEL_MAX = 120;
 export const SOURCE_URL_MAX = 500;
 

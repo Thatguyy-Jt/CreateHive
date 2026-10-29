@@ -1,7 +1,7 @@
 "use client";
 
 import { addResultsAction } from "@/app/app/analytics/actions";
-import { RESULT_FIELD_LABELS, type ResultField } from "@/lib/schemas/analytics";
+import { RESULT_FIELD_LABELS, type ResultField } from "@/lib/schemas/labels";
 import { Field, FormAlert } from "./fields";
 import { useAnalyticsForm } from "./use-analytics-form";
 

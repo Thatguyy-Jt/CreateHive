@@ -11,8 +11,8 @@ export const MAX_SLOTS_PER_REQUEST = 20;
 export const MAX_DAYS_AHEAD = 180;
 /** How far in the past a time may be and still count as "now". Mirrors `schedule_content_ideas`. */
 export const PAST_GRACE_MS = 60 * 60 * 1000;
-/** Default time for new items. We don't recommend posting times. */
-export const DEFAULT_TIME = "09:00";
+// DEFAULT_TIME is in the zod-free ./limits (client date fields use it).
+export { DEFAULT_TIME } from "./limits";
 /** Most items the weekly plan puts on one day, counting what's already scheduled. */
 export const MAX_PER_DAY = 2;
 

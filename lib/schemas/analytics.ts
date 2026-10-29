@@ -2,6 +2,8 @@ import { z } from "zod";
 import { addDays } from "@/lib/calendar/dates";
 import { dateKey, timeKey } from "./calendar";
 import { platform } from "./creator";
+import type { ResultField } from "./labels";
+import { FORMAT_MAX, TITLE_MAX } from "./limits";
 import { formatRulesFor } from "./studio";
 
 // Posts (published `content_items`) and their results check-ins
@@ -17,8 +19,8 @@ export const MAX_POSTS = 500;
 /** Most check-ins per post. */
 export const MAX_CHECKINS = 50;
 
-export const TITLE_MAX = 200;
-export const FORMAT_MAX = 60;
+// TITLE_MAX and FORMAT_MAX are in the zod-free ./limits (client forms import them from there).
+export { FORMAT_MAX, TITLE_MAX } from "./limits";
 export const URL_MAX = 500;
 export const HOOK_MAX = 300;
 export const DURATION_MAX_SECONDS = 86_400;
@@ -65,14 +67,8 @@ export function parseDuration(value: string): number | null {
   return Number(match[1] ?? 0) * 3600 + Number(match[2]) * 60 + Number(match[3]);
 }
 
-/** "1:35" for 95, "1:02:03" for 3723. */
-export function formatDuration(seconds: number): string {
-  const whole = Math.round(seconds);
-  const h = Math.floor(whole / 3600);
-  const m = Math.floor((whole % 3600) / 60);
-  const s = String(whole % 60).padStart(2, "0");
-  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
-}
+// formatDuration lives in the zod-free lib/analytics/format (client charts use it).
+export { formatDuration } from "@/lib/analytics/format";
 
 // Absent fields (a form that doesn't show them) count as empty.
 const durationField = (label: string) =>
@@ -177,29 +173,11 @@ export type PastPostInput = z.infer<ReturnType<typeof pastPostInputFor>>;
 // Results check-in
 // ---------------------------------------------------------------------------
 
-export const RESULT_FIELDS = [
-  "views",
-  "likes",
-  "comments",
-  "shares",
-  "saves",
-  "follower_delta",
-  "avg_view_duration_seconds",
-  "avg_percent_viewed",
-] as const;
-export type ResultField = (typeof RESULT_FIELDS)[number];
+// RESULT_FIELDS and their labels are in the zod-free ./labels (client forms import them from there).
+export { RESULT_FIELD_LABELS, RESULT_FIELDS } from "./labels";
+export type { ResultField } from "./labels";
 export const VIDEO_RESULT_FIELDS: ReadonlySet<ResultField> = new Set(["avg_view_duration_seconds", "avg_percent_viewed"]);
 
-export const RESULT_FIELD_LABELS: Record<ResultField, string> = {
-  views: "Views",
-  likes: "Likes",
-  comments: "Comments",
-  shares: "Shares",
-  saves: "Saves",
-  follower_delta: "Follower change",
-  avg_view_duration_seconds: "Average view duration",
-  avg_percent_viewed: "Average % viewed",
-};
 
 export const EMPTY_RESULTS_MESSAGE = "Enter at least one number.";
 

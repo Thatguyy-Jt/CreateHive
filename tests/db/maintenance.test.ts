@@ -49,6 +49,25 @@ describe("abandoned generations", () => {
   });
 });
 
+describe("sweep indexes", () => {
+  it.each([
+    [
+      "ai_generations_pending_created_at_idx",
+      "select id from public.ai_generations where status = 'pending' and created_at < now() - interval '15 minutes'",
+    ],
+    ["research_signals_expires_at_idx", "select id from public.research_signals where expires_at < now()"],
+  ])("%s serves its sweep", async (index, query) => {
+    // Tiny tables favour a seq scan; disable it to check the index is usable.
+    await db.exec("set enable_seqscan = off");
+    try {
+      const { rows } = await db.query<{ "QUERY PLAN": string }>(`explain ${query}`);
+      expect(rows.map((r) => r["QUERY PLAN"]).join("\n")).toContain(index);
+    } finally {
+      await db.exec("reset enable_seqscan");
+    }
+  });
+});
+
 describe("expired signals", () => {
   it("deletes expired rows and keeps unexpired and expiry-less ones", async () => {
     await asService(db, async (tx) => {

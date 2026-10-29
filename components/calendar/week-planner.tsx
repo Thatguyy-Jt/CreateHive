@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { acceptPlanAction, generateWeeklyPlanAction } from "@/app/app/calendar/actions";
 import { formatDay } from "@/lib/calendar/dates";
 import type { ProposedSlot } from "@/lib/schemas/calendar";
-import { PLATFORM_LABELS } from "@/lib/schemas/creator";
+import { PLATFORM_LABELS } from "@/lib/schemas/labels";
 
 interface Proposal {
   slots: ProposedSlot[];

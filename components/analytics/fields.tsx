@@ -1,5 +1,5 @@
 import type { InputHTMLAttributes, ReactNode } from "react";
-import { PLATFORM_LABELS, platform as platformSchema } from "@/lib/schemas/creator";
+import { PLATFORM_LABELS, PLATFORMS } from "@/lib/schemas/labels";
 
 // Labelled controls for the analytics forms. Ids are prefixed so two forms can
 // share a page; help and error text are linked with aria-describedby.
@@ -71,7 +71,7 @@ export function PlatformField({ prefix, error, defaultValue }: { prefix: string;
         <option value="" disabled>
           Choose a platform
         </option>
-        {platformSchema.options.map((option) => (
+        {PLATFORMS.map((option) => (
           <option key={option} value={option}>
             {PLATFORM_LABELS[option]}
           </option>

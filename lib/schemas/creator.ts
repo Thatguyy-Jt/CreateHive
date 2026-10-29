@@ -1,45 +1,18 @@
 import { z } from "zod";
 import { experienceLevel } from "./enums";
+import { CREATOR_GOALS, PLATFORMS, type Platform } from "./labels";
 
 // Creator identity (onboarding input) and the persistent strategy.
 //
 // `creator_profiles.platforms` and `.goals` are unconstrained `text[]`; the
-// closed vocabularies live here so adding a platform needs no migration.
+// closed vocabularies live in code so adding a platform needs no migration.
+// Their value lists and labels are in the zod-free ./labels (client components
+// import them from there) and are re-exported here for server code.
+export { EXPERIENCE_LABELS, GOAL_LABELS, PLATFORM_LABELS } from "./labels";
+export type { CreatorGoal, Platform } from "./labels";
 
-export const platform = z.enum(["youtube", "tiktok", "instagram", "linkedin", "x", "other"]);
-export type Platform = z.infer<typeof platform>;
-
-export const PLATFORM_LABELS: Record<Platform, string> = {
-  youtube: "YouTube",
-  tiktok: "TikTok",
-  instagram: "Instagram",
-  linkedin: "LinkedIn",
-  x: "X",
-  other: "Other",
-};
-
-export const creatorGoal = z.enum([
-  "grow_audience",
-  "build_authority",
-  "monetize",
-  "get_ugc_clients",
-  "stay_consistent",
-]);
-export type CreatorGoal = z.infer<typeof creatorGoal>;
-
-export const GOAL_LABELS: Record<CreatorGoal, string> = {
-  grow_audience: "Grow my audience",
-  build_authority: "Build authority in my niche",
-  monetize: "Start earning from content",
-  get_ugc_clients: "Land UGC or brand clients",
-  stay_consistent: "Post consistently",
-};
-
-export const EXPERIENCE_LABELS: Record<z.infer<typeof experienceLevel>, string> = {
-  beginner: "Just starting",
-  growing: "Posting for a while",
-  established: "Have an audience",
-};
+export const platform = z.enum(PLATFORMS);
+export const creatorGoal = z.enum(CREATOR_GOALS);
 
 const unique = <T>(items: T[]) => new Set(items).size === items.length;
 

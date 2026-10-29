@@ -1,6 +1,5 @@
 // Display helpers for results (en-US, matching the rest of the app). Pure.
 
-import { formatDuration } from "@/lib/schemas/analytics";
 import type { ComparisonLabel, Metric } from "./baseline";
 
 const full = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
@@ -29,7 +28,14 @@ export function formatMetric(metric: Metric, value: number): string {
   return formatCount(Math.round(value));
 }
 
-export { formatDuration };
+/** "1:35" for 95, "1:02:03" for 3723. */
+export function formatDuration(seconds: number): string {
+  const whole = Math.round(seconds);
+  const h = Math.floor(whole / 3600);
+  const m = Math.floor((whole % 3600) / 60);
+  const s = String(whole % 60).padStart(2, "0");
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
+}
 
 /** Decorative only: the words carry the meaning. */
 export const LABEL_ARROWS: Record<ComparisonLabel, string> = { above: "↑", around: "→", below: "↓" };

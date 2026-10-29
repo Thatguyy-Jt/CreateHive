@@ -56,6 +56,13 @@ export async function getMonthlyUsage(
   plan: SubscriptionPlan,
   now: number,
 ): Promise<MonthlyUsageResult> {
+  return applyAllowances(await countMonthlyUses(client, userId, now), plan);
+}
+
+type KindCounts = { ok: true; counts: Map<string, number> } | { ok: false };
+
+/** Uses per AI kind in the allowance window. Independent of the plan, so it can run alongside the plan read. */
+async function countMonthlyUses(client: AiDbClient, userId: string, now: number): Promise<KindCounts> {
   try {
     const { data, error } = await client
       .from("ai_generations")
@@ -69,14 +76,7 @@ export async function getMonthlyUsage(
     }
     const counts = new Map<string, number>();
     for (const row of (data ?? []) as { kind: string }[]) counts.set(row.kind, (counts.get(row.kind) ?? 0) + 1);
-    return {
-      ok: true,
-      features: QUOTA_FEATURES.map((feature) => ({
-        ...feature,
-        used: counts.get(feature.kind) ?? 0,
-        limit: PLAN_ALLOWANCES[plan][feature.kind],
-      })),
-    };
+    return { ok: true, counts };
   } catch (error) {
     logEvent("error", "ai_usage_read_failed", {
       stage: "monthly_unexpected",
@@ -86,6 +86,18 @@ export async function getMonthlyUsage(
   }
 }
 
+function applyAllowances(result: KindCounts, plan: SubscriptionPlan): MonthlyUsageResult {
+  if (!result.ok) return { ok: false };
+  return {
+    ok: true,
+    features: QUOTA_FEATURES.map((feature) => ({
+      ...feature,
+      used: result.counts.get(feature.kind) ?? 0,
+      limit: PLAN_ALLOWANCES[plan][feature.kind],
+    })),
+  };
+}
+
 export interface PlanUsage {
   /** The instant the reads used, for anything else the page computes. */
   now: number;
@@ -93,9 +105,8 @@ export interface PlanUsage {
   monthly: MonthlyUsageResult;
 }
 
-/** The creator's plan and their monthly usage against it, read at one instant. */
+/** The creator's plan and their monthly usage against it, read at one instant. The two reads run in parallel. */
 export async function getPlanUsage(client: AiDbClient, userId: string, now: number = Date.now()): Promise<PlanUsage> {
-  const allowance = await getAllowance(client, userId, now);
-  const monthly = await getMonthlyUsage(client, userId, allowance.plan.id, now);
-  return { now, allowance, monthly };
+  const [allowance, counts] = await Promise.all([getAllowance(client, userId, now), countMonthlyUses(client, userId, now)]);
+  return { now, allowance, monthly: applyAllowances(counts, allowance.plan.id) };
 }

@@ -36,6 +36,8 @@ pnpm exec playwright show-report  # HTML report of the last run
 
 Without `E2E_CLERK_USER_EMAIL`, only the public specs run and the rest show as skipped.
 
+**Stop your own `pnpm dev` first.** Next.js allows only one dev server per project folder, so the suite's server on :3100 won't start while yours runs ("Another next dev server is already running").
+
 ### What it does to your data
 
 - **The test creator's data is deleted at the start of every run,** so each run starts fresh. The Clerk user is kept. No other creator is touched.

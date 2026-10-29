@@ -20,6 +20,7 @@
     "@sentry/nextjs": "^11.6.0",
     "@supabase/supabase-js": "^2.117.3",
     "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
     "ai": "^7.0.137",
     "next": "16.4.2",
     "react": "19.3.0",

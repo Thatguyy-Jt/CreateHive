@@ -55,7 +55,8 @@ export function PrivacySection() {
         </li>
         <li>
           If something breaks, an error report goes to our monitoring service (Sentry) with cookies, request details
-          and your account removed. Page views are measured with Vercel Analytics, which doesn&apos;t use cookies.
+          and your account removed. Page views are measured with Vercel Analytics, and page speed (how quickly pages load
+          and respond) with Vercel Speed Insights. Neither uses cookies.
         </li>
         <li>
           You can download all of this as one file from <strong>Your data</strong> below.

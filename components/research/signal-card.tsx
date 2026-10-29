@@ -2,7 +2,8 @@
 
 import { useActionState, useState } from "react";
 import { deleteSignalAction, type DeleteSignalState } from "@/app/app/research/actions";
-import { SIGNAL_SOURCE_LABELS, SIGNAL_TYPE_LABELS, type StoredSignal } from "@/lib/schemas/research";
+import { SIGNAL_SOURCE_LABELS, SIGNAL_TYPE_LABELS } from "@/lib/schemas/labels";
+import type { StoredSignal } from "@/lib/schemas/research";
 
 const IDLE: DeleteSignalState = { status: "idle", message: null };
 const DATE = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" });

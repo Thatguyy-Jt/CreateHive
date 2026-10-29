@@ -9,7 +9,7 @@ import {
   type CalendarActionState,
 } from "@/app/app/calendar/actions";
 import { formatDay, formatTime } from "@/lib/calendar/dates";
-import { PLATFORM_LABELS } from "@/lib/schemas/creator";
+import { PLATFORM_LABELS } from "@/lib/schemas/labels";
 import type { CalendarItem } from "@/lib/services/calendar";
 import { DateTimeFields } from "./date-time-fields";
 

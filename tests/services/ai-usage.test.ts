@@ -100,6 +100,32 @@ describe("getPlanUsage", () => {
     expect(result.monthly.ok && result.monthly.features.find((f) => f.kind === "content_package")?.limit).toBe(30);
   });
 
+  it("starts the plan read and the usage count together", async () => {
+    // Each query only resolves once both have started: run one after the other, this never settles.
+    const started: string[] = [];
+    let release!: () => void;
+    const bothStarted = new Promise<void>((resolve) => (release = resolve));
+    const db = {
+      from(table: string) {
+        started.push(table);
+        if (started.length === 2) release();
+        const data = table === "subscriptions" ? null : [];
+        const chain: Record<string, unknown> = {
+          then: (resolve: (v: unknown) => unknown) => bothStarted.then(() => resolve({ data, error: null })),
+        };
+        for (const method of ["select", "eq", "gte", "or", "maybeSingle"]) chain[method] = () => chain;
+        return chain;
+      },
+    } as unknown as AiDbClient;
+
+    const result = await Promise.race([
+      getPlanUsage(db, USER_ID, NOW),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("reads ran sequentially")), 1000)),
+    ]);
+    expect(started.sort()).toEqual(["ai_generations", "subscriptions"]);
+    expect(result).toMatchObject({ allowance: { plan: { id: "free" } }, monthly: { ok: true } });
+  });
+
   it("reports a failed read without throwing or logging ids", async () => {
     const { db } = fakeDb({ countError: { code: "42501", message: "denied" } });
     await expect(getPlanUsage(db, USER_ID, NOW)).resolves.toMatchObject({ monthly: { ok: false } });

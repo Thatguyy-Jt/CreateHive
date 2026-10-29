@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useActionState } from "react";
 import { updateOpportunityStatusAction, type StatusActionState } from "@/app/app/opportunities/actions";
-import { PLATFORM_LABELS } from "@/lib/schemas/creator";
+import { PLATFORM_LABELS } from "@/lib/schemas/labels";
 import type { IdeaStatus, SignalLevel } from "@/lib/schemas/enums";
 import type { StoredOpportunity } from "@/lib/schemas/opportunities";
 import { StartStudioForm } from "../studio/start-studio-form";

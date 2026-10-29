@@ -1,7 +1,7 @@
 "use client";
 
 import { logPastPostAction } from "@/app/app/analytics/actions";
-import { FORMAT_MAX, TITLE_MAX } from "@/lib/schemas/analytics";
+import { FORMAT_MAX, TITLE_MAX } from "@/lib/schemas/limits";
 import { Field, FormAlert, PlatformField, PostDateFields, PostDetailFields } from "./fields";
 import { useAnalyticsForm } from "./use-analytics-form";
 

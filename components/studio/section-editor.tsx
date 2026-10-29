@@ -3,7 +3,7 @@
 import { useState, useTransition, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { savePackageSectionAction } from "@/app/app/studio/actions";
-import { PLATFORM_LABELS, type Platform } from "@/lib/schemas/creator";
+import { PLATFORM_LABELS, type Platform } from "@/lib/schemas/labels";
 import type { SectionKey, SectionValue, StudioPackage } from "@/lib/schemas/studio";
 
 // Limits mirror `studioPackage`; the server validates again.

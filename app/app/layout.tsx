@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { Suspense } from "react";
+import { nunitoSans } from "@/app/app-font";
 import { AppHeader } from "@/components/app-shell/app-header";
 import { Sidebar } from "@/components/app-shell/sidebar";
 import { Toaster } from "@/components/ui/toaster";
@@ -17,7 +18,7 @@ async function RequireSession() {
 
 export default function AppLayout({ children }: LayoutProps<"/app">) {
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${nunitoSans.variable}`}>
       <a href="#main" className="skip-link">
         Skip to content
       </a>

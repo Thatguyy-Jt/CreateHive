@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { EXPERIENCE_LEVELS } from "./labels";
 
 // Every value list here mirrors a `check` constraint in
 // supabase/migrations/20261009000100_core_schema.sql. `DB_ENUM_COLUMNS` maps
@@ -24,7 +25,7 @@ export type PaymentKind = z.infer<typeof paymentKind>;
 export const paymentStatus = z.enum(["pending", "succeeded", "failed"]);
 export type PaymentStatus = z.infer<typeof paymentStatus>;
 
-export const experienceLevel =z.enum(["beginner", "growing", "established"]);
+export const experienceLevel = z.enum(EXPERIENCE_LEVELS);
 export type ExperienceLevel = z.infer<typeof experienceLevel>;
 
 export const onboardingStatus = z.enum(["not_started", "in_progress", "completed"]);

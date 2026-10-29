@@ -1,4 +1,5 @@
-import { EVIDENCE_KIND_LABELS, type IdeaEvidence } from "@/lib/schemas/opportunities";
+import { EVIDENCE_KIND_LABELS } from "@/lib/schemas/labels";
+import type { IdeaEvidence } from "@/lib/schemas/opportunities";
 
 /** An idea's evidence: kind, summary and, when a signal backs it, its source (linked when it has a URL). Text only. */
 export function EvidenceList({ evidence }: { evidence: IdeaEvidence }) {

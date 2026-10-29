@@ -4,7 +4,8 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { addSignalAction, type AddSignalState } from "@/app/app/research/actions";
 import { SelectField, TextAreaField, TextField } from "@/components/onboarding/fields";
-import { MANUAL_TEXT_MAX, manualSignalType, SIGNAL_TYPE_LABELS } from "@/lib/schemas/research";
+import { MANUAL_SIGNAL_TYPES, SIGNAL_TYPE_LABELS } from "@/lib/schemas/labels";
+import { MANUAL_TEXT_MAX } from "@/lib/schemas/limits";
 
 const INITIAL: AddSignalState = {
   status: "idle",
@@ -14,7 +15,7 @@ const INITIAL: AddSignalState = {
   submission: 0,
 };
 
-const TYPE_OPTIONS = manualSignalType.options.map((value) => ({ value, label: SIGNAL_TYPE_LABELS[value] }));
+const TYPE_OPTIONS = MANUAL_SIGNAL_TYPES.map((value) => ({ value, label: SIGNAL_TYPE_LABELS[value] }));
 
 function TextWithCounter({ defaultValue, error }: { defaultValue: string; error?: string }) {
   const [length, setLength] = useState(defaultValue.length);

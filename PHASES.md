@@ -107,12 +107,23 @@ Part 3 (`prompts/monitoring-and-alerting.md`):
 
 Part 4 (`prompts/playwright-smoke-tests.md`): Playwright smoke tests in `e2e/` (`pnpm test:e2e`), covering public pages at desktop and phone width, onboarding, the data export, the delete-confirm gating and every app page. They run against a dedicated Clerk dev test creator, reset each run, with AI off. Local only for now; see `docs/testing.md`.
 
+Part 5 (`prompts/performance-pass.md`, measured before and after):
+- Zod removed from every client bundle (−29 KB gzipped on the dashboard, Research, Analytics and Onboarding).
+- Public-page font preloads cut from 92 to 39 KB (Nunito Sans only on the logged-in shells).
+- `/api/health` down from ~611 ms to ~251 ms (no table count).
+- Partial indexes for the daily sweeps.
+- Plan and usage reads run in parallel.
+- Hero `priority` → `preload`.
+- Vercel Speed Insights added.
+
+Remaining: the error-handling item below has no part yet.
+
 - [ ] Error handling and recovery for all AI / external calls
 - [x] Monitoring and alerting
 - [x] Background jobs with retries (Vercel Cron)
 - [x] Tests (Vitest, Playwright)
 - [x] Data handling (export, deletion)
-- [ ] Performance improvements
+- [x] Performance improvements
 
 ## Phase 8 — Beta — ⬜ Not done
 

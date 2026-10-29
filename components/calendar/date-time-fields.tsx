@@ -1,4 +1,4 @@
-import { DEFAULT_TIME } from "@/lib/schemas/calendar";
+import { DEFAULT_TIME } from "@/lib/schemas/limits";
 
 /** Native, labelled date and time inputs: accessible and mobile-friendly. Ids are prefixed to stay unique. */
 export function DateTimeFields({

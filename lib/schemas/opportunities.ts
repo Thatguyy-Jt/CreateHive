@@ -1,20 +1,18 @@
 import { z } from "zod";
 import { platform, type Platform } from "./creator";
 import { difficulty, ideaStatus, signalLevel, type IdeaStatus } from "./enums";
+import { EVIDENCE_KINDS, type EvidenceKind } from "./labels";
 import { parseWith } from "./parse";
 
 // Shape of `content_ideas.evidence`. Every piece of evidence records where it
 // came from, so a recommendation can always explain itself (AGENTS.md §12).
 
-export const evidenceKind = z.enum([
-  "research_signal",
-  "creator_history",
-  "audience_comment",
-  "competitor",
-  "trend",
-  "creator_input",
-]);
-export type EvidenceKind = z.infer<typeof evidenceKind>;
+// The value list and labels are in the zod-free ./labels (client components
+// import them from there); re-exported here.
+export { EVIDENCE_KIND_LABELS } from "./labels";
+export type { EvidenceKind } from "./labels";
+
+export const evidenceKind = z.enum(EVIDENCE_KINDS);
 
 export const evidenceItem = z.object({
   kind: evidenceKind,
@@ -40,14 +38,6 @@ export const OPPORTUNITY_BATCH_SIZE = 5;
 /** Evidence kinds the model may cite, at least one. Built per request from the data we actually have. */
 export type AllowedEvidenceKinds = readonly [EvidenceKind, ...EvidenceKind[]];
 
-export const EVIDENCE_KIND_LABELS: Record<EvidenceKind, string> = {
-  creator_input: "From your profile",
-  creator_history: "From your past performance",
-  research_signal: "From research",
-  audience_comment: "From audience comments",
-  competitor: "From a competitor you noted",
-  trend: "From trend data",
-};
 
 /** Lowercased, whitespace-collapsed topic, for duplicate checks. */
 export function normalizeTopic(topic: string): string {
